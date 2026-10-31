@@ -106,4 +106,5 @@ Los láseres de show pueden causar daño ocular permanente. Esta app ayuda, pero
 
 - Arquitectura y protocolo (HTTP + WebSocket): [`DESIGN.md`](DESIGN.md).
 - Pruebas del backend: `cd webapp && python -m unittest discover -s tests -t . -v`
-- Prueba de la interfaz (Playwright para Node): `node tests/e2e/ui_mock.cjs`
+- Prueba de la interfaz con un backend simulado (Playwright para Node): `node tests/e2e/ui_mock.cjs`
+- Prueba de punta a punta con el servidor real: `PYTHON=.venv/bin/python node tests/e2e/integration.cjs`
