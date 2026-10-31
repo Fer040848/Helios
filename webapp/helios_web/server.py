@@ -198,6 +198,11 @@ def _static_response(path):
     return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
 
 
+async def runtime_info(request):
+    """Tells the frontend it is served by this server (static hosts serve static/runtime.json: mode "webusb")."""
+    return web.json_response({"mode": "server"}, headers={"Cache-Control": "no-cache"})
+
+
 async def index(request):
     return _static_response(os.path.join(request.app[STATIC], "index.html"))
 
@@ -216,6 +221,7 @@ def create_app(engine, static_dir=STATIC_DIR):
     app[CLIENTS] = set()
     app[STATIC] = static_dir
     app.router.add_get("/", index)
+    app.router.add_get("/static/runtime.json", runtime_info)    # before the static catch-all
     app.router.add_get("/static/{path:.+}", static_file)
     app.router.add_get("/api/state", api_state)
     app.router.add_get("/ws", ws_handler)

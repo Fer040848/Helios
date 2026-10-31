@@ -178,3 +178,15 @@ Blanked moves between strokes (interpolated, then a few blanked dwell points at 
 evenly along each stroke, extra dwell points on sharp corners (> ~45°) and at stroke ends, closed strokes return to
 their first vertex. Each frame has at least `max(200, pps × 0.012)` points (pad by repeating) and at most 4095
 (resample coarser to fit). Then: brightness, scanSize, invert/swap, clamp, beam safety.
+
+## Published site (WebUSB, no server)
+
+`static/` is also deployed as a plain static site (Vercel, `static/vercel.json`, domain dac.ferchx.com). At start-up
+`net.js` reads `/static/runtime.json`: the Python server answers `{"mode": "server"}` (WebSocket transport); the
+static file says `{"mode": "webusb"}`, and the page instead loads `static/engine/local.js` — an in-browser backend that
+speaks the exact protocol above, with the engine ported to JavaScript (`static/engine/*.js`, point-for-point parity
+with the Python engine, enforced by `tests/js/engine.test.mjs`) and the DAC driven over WebUSB
+(`static/engine/helios-usb.js`, a port of the SDK's USB device: interface 0 alt 1, control on interrupt EP 0x06/0x83,
+frames on bulk EP 0x02). Its `state` adds `"transport": "webusb"` and `"usbSupported"`; `rescan` opens the browser's
+device picker. Same safety rules, plus: unplugging the DAC, a DAC that stops answering, or the page going to the
+background all black out. Only USB DACs (browsers cannot speak IDN/UDP).

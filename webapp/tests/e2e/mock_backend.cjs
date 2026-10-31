@@ -6,9 +6,12 @@ const path = require('path');
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 
-function startStaticServer(root) {
+// api: true mimics the Python server (/static/runtime.json says mode "server", so the page uses the WebSocket); api: false is a plain
+// static host like dac.ferchx.com (the page then runs its in-browser engine).
+function startStaticServer(root, { api = true } = {}) {
   const srv = http.createServer((req, res) => {
     const p = decodeURIComponent(req.url.split('?')[0]);
+    if (api && p === '/static/runtime.json') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"mode":"server"}'); return; }
     const rel = p === '/' ? 'index.html' : p.startsWith('/static/') ? p.slice(8) : null;
     const file = rel && path.resolve(root, rel);
     if (!file || !file.startsWith(root + path.sep) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }

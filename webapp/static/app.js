@@ -803,12 +803,22 @@ function renderDacs() {
           `<li>${esc(d.name)} <span>${esc(kinds[d.kind] || d.kind)}</span></li>`,
       )
       .join("") || "<li>Ningún DAC encontrado</li>";
-  $("#rescan").disabled = !online || !!S?.armed;
-  $("#rescan-hint").hidden = !S?.armed;
+  const webusb = S?.transport === "webusb";
+  $("#rescan span").textContent = webusb ? "Conectar DAC por USB" : "Buscar DAC";
+  $("#rescan").disabled = !online || !!S?.armed || (webusb && !S?.usbSupported);
+  const hint = S?.armed
+    ? "Solo disponible con la emisión apagada."
+    : webusb && !S?.usbSupported
+      ? "Este navegador no puede usar USB: abre la página en Chrome o Edge (Android o computadora)."
+      : webusb
+        ? "Conecta el Helios por USB (en Android, con un cable OTG) y elígelo en la ventana del navegador."
+        : "";
+  $("#rescan-hint").textContent = hint;
+  $("#rescan-hint").hidden = !hint;
 }
 $("#rescan").addEventListener("click", () => {
   send({ type: "rescan" });
-  toast("Buscando DAC…");
+  if (S?.transport !== "webusb") toast("Buscando DAC…");
 });
 
 // ---------- tabs ----------

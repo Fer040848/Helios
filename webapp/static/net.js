@@ -1,6 +1,31 @@
+// Transport selection. Served by the Python server (python -m helios_web) -> WebSocket to it. Served as a static
+// site (e.g. dac.ferchx.com) -> the in-browser engine, which drives the DAC over WebUSB (engine/local.js).
+// "?modo=usb" forces the in-browser engine.
+export function connect(handlers) {
+  let impl = null;
+  const forced = new URLSearchParams(location.search).get("modo") === "usb";
+  // static/runtime.json says {"mode": "webusb"} on a static host; the Python server answers {"mode": "server"}.
+  const probe = forced
+    ? Promise.resolve(false)
+    : fetch("/static/runtime.json", { cache: "no-store", signal: AbortSignal.timeout(2500) })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((info) => info?.mode === "server")
+        .catch(() => false);
+  probe.then(async (hasServer) => {
+    if (hasServer) {
+      impl = connectSocket(handlers);
+    } else {
+      const { LocalBackend } = await import("./engine/local.js");
+      impl = new LocalBackend(handlers);
+      impl.start();
+    }
+  });
+  return { send: (obj) => (impl ? impl.send(obj) : false) };
+}
+
 // WebSocket connection with capped exponential backoff and a stale-socket watchdog.
 // Nothing is queued while disconnected: send() simply returns false.
-export function connect({ onMessage, onStatus }) {
+function connectSocket({ onMessage, onStatus }) {
   let ws = null,
     attempt = 0,
     timer = 0,

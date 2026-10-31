@@ -26,6 +26,22 @@ usarla como app.
 
 Sin láser conectado arranca en **modo simulador**: todo funciona igual y ves la vista previa, ideal para probar.
 
+## Versión web publicada (sin instalar nada): dac.ferchx.com
+
+Abre **https://dac.ferchx.com** en **Chrome o Edge** y la página controla el DAC **directamente por USB** (WebUSB),
+sin Python ni servidor:
+
+- **Celular Android**: conecta el Helios al teléfono con un **cable USB OTG**, abre la página, ve a **Ajustes →
+  Conectar DAC por USB** y elige el Helios. Después de la primera vez se reconecta solo.
+- **Computadora** (Windows, macOS, Linux, Chromebook): igual, con el Helios conectado por USB.
+- **iPhone / Safari / Firefox** no tienen WebUSB: ahí la página funciona solo como demo con simulador. Para usar un
+  iPhone como control remoto usa la app Python de abajo en una computadora con el DAC.
+- Sin DAC conectado funciona en modo simulador. Los ajustes y cues se guardan en el navegador.
+- La versión web solo maneja DACs **USB** (los DACs de red IDN necesitan la app Python).
+- Por seguridad, si la app pasa a segundo plano (otra app, pantalla apagada) la salida se apaga sola; mientras emite,
+  la pantalla se mantiene encendida.
+- Linux: si Chrome no ve el DAC, configura las reglas udev de `docs/udev_rules_for_linux.md`.
+
 ## Instalación
 
 Requisitos: **Python 3.9 o superior** en la computadora del DAC.
@@ -107,4 +123,6 @@ Los láseres de show pueden causar daño ocular permanente. Esta app ayuda, pero
 - Arquitectura y protocolo (HTTP + WebSocket): [`DESIGN.md`](DESIGN.md).
 - Pruebas del backend: `cd webapp && python -m unittest discover -s tests -t . -v`
 - Prueba de la interfaz con un backend simulado (Playwright para Node): `node tests/e2e/ui_mock.cjs`
+- Versión web (WebUSB simulado en el navegador): `node tests/e2e/static_webusb.cjs`
+- Motor JavaScript (paridad exacta con Python y seguridad WebUSB): `node --test tests/js/engine.test.mjs`
 - Prueba de punta a punta con el servidor real: `PYTHON=.venv/bin/python node tests/e2e/integration.cjs`

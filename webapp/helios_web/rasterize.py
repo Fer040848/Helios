@@ -31,6 +31,12 @@ _JOIN_EPS = 1e-4
 BLANK = (0.0, 0.0, 0.0)
 
 
+def _steps(x):
+    """ceil() that ignores float noise, so a length that is an exact multiple of the step (up to rounding) gives the
+    same point count in this engine and in the JavaScript port (static/engine/rasterize.js)."""
+    return math.ceil(x - 1e-9)
+
+
 def output_transform(strokes, settings):
     """Apply scan size, swap and invert (in that order), then clamp to [-1, 1]."""
     k = settings["scanSize"]
@@ -62,7 +68,7 @@ def _corner(prev, cur, nxt):
     if la < _JOIN_EPS or lb < _JOIN_EPS:
         return False
     cos = max(-1.0, min(1.0, (ax * bx + ay * by) / (la * lb)))
-    return math.acos(cos) > CORNER_ANGLE
+    return math.acos(cos) > CORNER_ANGLE + 1e-9  # exact 45-degree turns are not corners (no float noise)
 
 
 def _rasterize_once(strokes, lit_step, blank_step):
@@ -78,7 +84,7 @@ def _rasterize_once(strokes, lit_step, blank_step):
         if jump:
             n = max(
                 1,
-                math.ceil(
+                _steps(
                     math.hypot(start[0] - pos[0], start[1] - pos[1]) / blank_step
                 ),
             )
@@ -99,7 +105,7 @@ def _rasterize_once(strokes, lit_step, blank_step):
             points.extend([tuple(start)] * START_DWELL)
         chain = list(pts) + ([pts[0]] if st.closed else [])
         for i, (a, b) in enumerate(zip(chain, chain[1:])):
-            n = max(1, math.ceil(math.hypot(b[0] - a[0], b[1] - a[1]) / lit_step))
+            n = max(1, _steps(math.hypot(b[0] - a[0], b[1] - a[1]) / lit_step))
             color = tuple(a[2:5])
             for k in range(1, n + 1):
                 points.append(
@@ -134,7 +140,7 @@ def rasterize(strokes, pps, max_points=MAX_POINTS):
     if not points:
         return [(0.0, 0.0) + BLANK] * min_points
     if len(points) < min_points:
-        points = points * math.ceil(min_points / len(points))
+        points = points * _steps(min_points / len(points))
     return points
 
 

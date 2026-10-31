@@ -53,7 +53,7 @@ def subdivide(strokes, max_len):
             continue
         pts = []
         for (x0, y0), (x1, y1) in segments(st):
-            n = max(1, math.ceil(math.hypot(x1 - x0, y1 - y0) / max_len))
+            n = max(1, math.ceil(math.hypot(x1 - x0, y1 - y0) / max_len - 1e-9))  # float-noise tolerant, as in JS
             pts.extend(
                 (x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n) for k in range(n)
             )

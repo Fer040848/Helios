@@ -72,6 +72,10 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             (await self.client.get("/static/..%2f..%2fserver.py")).status, 404
         )
 
+    async def test_runtime_info_selects_the_websocket_transport(self):
+        resp = await self.client.get("/static/runtime.json")
+        self.assertEqual((await resp.json())["mode"], "server")
+
     async def test_missing_static_dir_is_404_not_crash(self):
         app = create_app(self.engine, static_dir=os.path.join(self.tmp.name, "nope"))
         async with TestClient(TestServer(app)) as client:
