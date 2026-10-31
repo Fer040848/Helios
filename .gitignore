@@ -303,3 +303,10 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+## Helios Web Control (webapp)
+webapp/data/
+webapp/lib/
+webapp/tests/e2e/out/
+webapp/**/__pycache__/
+webapp/.venv/

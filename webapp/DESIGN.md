@@ -61,25 +61,25 @@ webapp/
 All fields optional on input; the server merges partial updates, clamps numbers to range, ignores unknown keys
 and invalid enum values.
 
-| field          | type / range                                   | default     | meaning |
-|----------------|------------------------------------------------|-------------|---------|
-| `pattern`      | pattern id (see registry)                      | `"circle"`  | base shape |
-| `text`         | string, ≤ 64 chars                             | `"HOLA"`    | used by `text` pattern |
-| `textMode`     | `"static"` \| `"scroll"`                       | `"static"`  | |
-| `drawing`      | list of strokes, each a list of `[x, y]`       | `[]`        | used by `drawing` pattern; ≤ 2000 points total (server truncates) |
-| `size`         | 0–1                                            | 0.6         | overall scale (1 = shape spans full range) |
-| `x`, `y`       | -1–1                                           | 0           | position |
-| `rotation`     | -180–180 (degrees)                             | 0           | static rotation |
-| `spin`         | -360–360 (degrees / second)                    | 0           | continuous rotation |
-| `speed`        | 0–2                                            | 1           | animation speed of animated patterns and text scroll |
-| `color`        | `"#rrggbb"`                                    | `"#00ff00"` | base colour |
-| `colorMode`    | `solid` \| `rainbow` \| `cycle` \| `beat`      | `"solid"`   | rainbow = hue along the path (moving); cycle = whole shape hue over time; beat = jump to next palette colour each beat |
-| `colorSpeed`   | 0–2                                            | 0.5         | |
-| `effect`       | `none` \| `pulse` \| `wave` \| `orbit` \| `bounce` \| `zoom` \| `strobe` \| `wobble` \| `drawOn` | `"none"` | motion effect |
-| `effectAmount` | 0–1                                            | 0.5         | |
-| `effectSpeed`  | 0–2                                            | 0.5         | ignored when `beatSync` (period follows BPM) |
-| `beatSync`     | bool                                           | false       | |
-| `mirror`       | `none` \| `h` \| `v` \| `quad`                 | `"none"`    | duplicate mirrored copies |
+| field          | type / range                                                                                     | default     | meaning                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `pattern`      | pattern id (see registry)                                                                        | `"circle"`  | base shape                                                                                                             |
+| `text`         | string, ≤ 64 chars                                                                               | `"HOLA"`    | used by `text` pattern                                                                                                 |
+| `textMode`     | `"static"` \| `"scroll"`                                                                         | `"static"`  |                                                                                                                        |
+| `drawing`      | list of strokes, each a list of `[x, y]`                                                         | `[]`        | used by `drawing` pattern; ≤ 2000 points total (server truncates)                                                      |
+| `size`         | 0–1                                                                                              | 0.6         | overall scale (1 = shape spans full range)                                                                             |
+| `x`, `y`       | -1–1                                                                                             | 0           | position                                                                                                               |
+| `rotation`     | -180–180 (degrees)                                                                               | 0           | static rotation                                                                                                        |
+| `spin`         | -360–360 (degrees / second)                                                                      | 0           | continuous rotation                                                                                                    |
+| `speed`        | 0–2                                                                                              | 1           | animation speed of animated patterns and text scroll                                                                   |
+| `color`        | `"#rrggbb"`                                                                                      | `"#00ff00"` | base colour                                                                                                            |
+| `colorMode`    | `solid` \| `rainbow` \| `cycle` \| `beat`                                                        | `"solid"`   | rainbow = hue along the path (moving); cycle = whole shape hue over time; beat = jump to next palette colour each beat |
+| `colorSpeed`   | 0–2                                                                                              | 0.5         |                                                                                                                        |
+| `effect`       | `none` \| `pulse` \| `wave` \| `orbit` \| `bounce` \| `zoom` \| `strobe` \| `wobble` \| `drawOn` | `"none"`    | motion effect                                                                                                          |
+| `effectAmount` | 0–1                                                                                              | 0.5         |                                                                                                                        |
+| `effectSpeed`  | 0–2                                                                                              | 0.5         | ignored when `beatSync` (period follows BPM)                                                                           |
+| `beatSync`     | bool                                                                                             | false       |                                                                                                                        |
+| `mirror`       | `none` \| `h` \| `v` \| `quad`                                                                   | `"none"`    | duplicate mirrored copies                                                                                              |
 
 Pattern registry (id → Spanish name): `circle` Círculo, `square` Cuadrado, `triangle` Triángulo, `star` Estrella,
 `heart` Corazón, `line` Línea, `spiral` Espiral, `wave` Onda, `lissajous` Lissajous, `tunnel` Túnel, `fan` Abanico,
@@ -89,13 +89,13 @@ Pattern registry (id → Spanish name): `circle` Círculo, `square` Cuadrado, `t
 
 ## Settings (projector / output)
 
-| field        | range        | default | |
-|--------------|--------------|---------|-|
-| `pps`        | 1000–65535   | 30000   | points per second |
-| `brightness` | 0–1          | 0.3     | master intensity |
-| `scanSize`   | 0.1–1        | 0.8     | output scan area |
-| `invertX`, `invertY`, `swapXY` | bool | false | projector orientation |
-| `beamSafety` | bool         | true    | see safety rule 5 |
+| field                          | range      | default |                       |
+| ------------------------------ | ---------- | ------- | --------------------- |
+| `pps`                          | 1000–65535 | 30000   | points per second     |
+| `brightness`                   | 0–1        | 0.3     | master intensity      |
+| `scanSize`                     | 0.1–1      | 0.8     | output scan area      |
+| `invertX`, `invertY`, `swapXY` | bool       | false   | projector orientation |
+| `beamSafety`                   | bool       | true    | see safety rule 5     |
 
 Settings and cues persist to `data/state.json`. Scene does not persist (cues do).
 
@@ -127,18 +127,18 @@ Server → client:
 
 Client → server:
 
-| message | effect |
-|---------|--------|
-| `{"type": "scene", "scene": {partial Scene}}` | merge into live scene; `activeCue = null` |
-| `{"type": "settings", "settings": {partial Settings}}` | merge, persist |
-| `{"type": "arm", "armed": bool}` | arm / disarm output |
-| `{"type": "blackout"}` | disarm immediately |
-| `{"type": "cue", "index": int}` | trigger cue (ignored if slot empty) |
-| `{"type": "saveCue", "index": int, "name": str}` | store current scene in slot, persist |
-| `{"type": "clearCue", "index": int}` | empty slot, persist |
-| `{"type": "tap"}` | tap tempo: BPM = 60 / mean of the last ≤ 4 intervals; taps more than 2 s apart restart the count |
-| `{"type": "bpm", "bpm": number}` | set BPM (40–240) |
-| `{"type": "rescan"}` | re-open DACs (only while disarmed; else `error`) |
+| message                                                | effect                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `{"type": "scene", "scene": {partial Scene}}`          | merge into live scene; `activeCue = null`                                                        |
+| `{"type": "settings", "settings": {partial Settings}}` | merge, persist                                                                                   |
+| `{"type": "arm", "armed": bool}`                       | arm / disarm output                                                                              |
+| `{"type": "blackout"}`                                 | disarm immediately                                                                               |
+| `{"type": "cue", "index": int}`                        | trigger cue (ignored if slot empty)                                                              |
+| `{"type": "saveCue", "index": int, "name": str}`       | store current scene in slot, persist                                                             |
+| `{"type": "clearCue", "index": int}`                   | empty slot, persist                                                                              |
+| `{"type": "tap"}`                                      | tap tempo: BPM = 60 / mean of the last ≤ 4 intervals; taps more than 2 s apart restart the count |
+| `{"type": "bpm", "bpm": number}`                       | set BPM (40–240)                                                                                 |
+| `{"type": "rescan"}`                                   | re-open DACs (only while disarmed; else `error`)                                                 |
 
 State:
 
@@ -146,15 +146,15 @@ State:
 {
   "armed": false,
   "simulated": true,
-  "dacs": [{"index": 0, "name": "Helios 1", "kind": "usb"}],
+  "dacs": [{ "index": 0, "name": "Helios 1", "kind": "usb" }],
   "scene": { "...": "Scene" },
   "settings": { "...": "Settings" },
-  "cues": [{"name": "Círculo", "scene": {}}, null],
+  "cues": [{ "name": "Círculo", "scene": {} }, null],
   "activeCue": null,
   "bpm": 120.0,
-  "patterns":   [{"id": "circle", "name": "Círculo"}],
-  "effects":    [{"id": "none", "name": "Ninguno"}],
-  "colorModes": [{"id": "solid", "name": "Sólido"}]
+  "patterns": [{ "id": "circle", "name": "Círculo" }],
+  "effects": [{ "id": "none", "name": "Ninguno" }],
+  "colorModes": [{ "id": "solid", "name": "Sólido" }]
 }
 ```
 
