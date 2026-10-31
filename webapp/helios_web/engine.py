@@ -153,10 +153,13 @@ class Engine:
     # ----- output control ----------------------------------------------------------------------------------
     def open(self):
         with self._out_lock:
-            dacs = self.output.open()
-            with self._lock:
-                self.dacs = dacs
-                self._changed()
+            self._open_locked()
+
+    def _open_locked(self):
+        dacs = self.output.open()
+        with self._lock:
+            self.dacs = dacs
+            self._changed()
 
     def arm(self, armed):
         if not armed:
