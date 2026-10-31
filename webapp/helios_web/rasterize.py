@@ -170,7 +170,11 @@ def build_frame(world_strokes, settings, max_points=MAX_POINTS):
     blanks the frame); ``points`` are what goes to the DAC.
     """
     strokes = output_transform(world_strokes, settings)
-    points = rasterize(strokes, settings["pps"], max_points)
+    points = rasterize(strokes, settings["pps"], max_points - TAIL_BLANK)
+    # Always end dark: if the DAC holds its last sample when the next frame is late, it holds a blanked point,
+    # never a stationary lit beam (this also covers a frame truncated mid-stroke).
+    x, y = points[-1][0], points[-1][1]
+    points = points + [(x, y) + BLANK] * TAIL_BLANK
     if settings["beamSafety"] and not beam_safe(points):
         return [], blank(points)
     return strokes, apply_brightness(points, settings["brightness"])
