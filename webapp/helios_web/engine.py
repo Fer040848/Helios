@@ -49,6 +49,7 @@ class Engine:
         self._clocks = Clocks()
         self._preview = []
         self._last_tick = None
+        self._avg_dt = 0.0
         self._dirty = False
         self._last_persist = 0.0
         self._thread = None
