@@ -22,7 +22,9 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.engine = Engine(self.output, sleep=lambda s: None)
         self.engine.open()
         self.engine.render(0.0)
-        self.client = TestClient(TestServer(create_app(self.engine, static_dir=self.tmp.name)))
+        self.client = TestClient(
+            TestServer(create_app(self.engine, static_dir=self.tmp.name))
+        )
         await self.client.start_server()
 
     async def asyncTearDown(self):
@@ -35,14 +37,26 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
                 data = json.loads((await ws.receive()).data)
                 if data["type"] == kind and predicate(data):
                     return data
+
         return await asyncio.wait_for(loop(), timeout)
 
     async def test_api_state_shape(self):
         resp = await self.client.get("/api/state")
         self.assertEqual(resp.status, 200)
         state = await resp.json()
-        for key in ("armed", "simulated", "dacs", "scene", "settings", "cues", "activeCue", "bpm",
-                    "patterns", "effects", "colorModes"):
+        for key in (
+            "armed",
+            "simulated",
+            "dacs",
+            "scene",
+            "settings",
+            "cues",
+            "activeCue",
+            "bpm",
+            "patterns",
+            "effects",
+            "colorModes",
+        ):
             self.assertIn(key, state)
         self.assertFalse(state["armed"])
         self.assertEqual(len(state["cues"]), 16)
@@ -54,7 +68,9 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resp.status, 200)
         self.assertIn("javascript", resp.headers["Content-Type"])
         self.assertEqual((await self.client.get("/static/missing.css")).status, 404)
-        self.assertEqual((await self.client.get("/static/..%2f..%2fserver.py")).status, 404)
+        self.assertEqual(
+            (await self.client.get("/static/..%2f..%2fserver.py")).status, 404
+        )
 
     async def test_missing_static_dir_is_404_not_crash(self):
         app = create_app(self.engine, static_dir=os.path.join(self.tmp.name, "nope"))
@@ -79,12 +95,19 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_messages_get_error_and_keep_connection(self):
         ws = await self.client.ws_connect("/ws")
         await self.receive(ws, "state")
-        for bad in ("not json", json.dumps({"type": "nope"}), json.dumps({"type": "cue", "index": 99}),
-                    json.dumps([1, 2]), json.dumps({"type": "arm"})):
+        for bad in (
+            "not json",
+            json.dumps({"type": "nope"}),
+            json.dumps({"type": "cue", "index": 99}),
+            json.dumps([1, 2]),
+            json.dumps({"type": "arm"}),
+        ):
             await ws.send_str(bad)
             await self.receive(ws, "error")
         await ws.send_json({"type": "scene", "scene": {"pattern": "star"}})
-        state = await self.receive(ws, "state", lambda d: d["state"]["scene"]["pattern"] == "star")
+        state = await self.receive(
+            ws, "state", lambda d: d["state"]["scene"]["pattern"] == "star"
+        )
         self.assertIsNone(state["state"]["activeCue"])
         await ws.close()
 

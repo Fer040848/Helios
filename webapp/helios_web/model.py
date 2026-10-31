@@ -9,16 +9,39 @@ import math
 import re
 
 PATTERNS = {
-    "circle": "Círculo", "square": "Cuadrado", "triangle": "Triángulo", "star": "Estrella",
-    "heart": "Corazón", "line": "Línea", "spiral": "Espiral", "wave": "Onda",
-    "lissajous": "Lissajous", "tunnel": "Túnel", "fan": "Abanico", "grid": "Rejilla",
-    "flower": "Flor", "text": "Texto", "drawing": "Dibujo",
+    "circle": "Círculo",
+    "square": "Cuadrado",
+    "triangle": "Triángulo",
+    "star": "Estrella",
+    "heart": "Corazón",
+    "line": "Línea",
+    "spiral": "Espiral",
+    "wave": "Onda",
+    "lissajous": "Lissajous",
+    "tunnel": "Túnel",
+    "fan": "Abanico",
+    "grid": "Rejilla",
+    "flower": "Flor",
+    "text": "Texto",
+    "drawing": "Dibujo",
 }
 EFFECTS = {
-    "none": "Ninguno", "pulse": "Pulso", "wave": "Ondulación", "orbit": "Órbita",
-    "bounce": "Rebote", "zoom": "Zoom", "strobe": "Estrobo", "wobble": "Vaivén", "drawOn": "Trazado",
+    "none": "Ninguno",
+    "pulse": "Pulso",
+    "wave": "Ondulación",
+    "orbit": "Órbita",
+    "bounce": "Rebote",
+    "zoom": "Zoom",
+    "strobe": "Estrobo",
+    "wobble": "Vaivén",
+    "drawOn": "Trazado",
 }
-COLOR_MODES = {"solid": "Sólido", "rainbow": "Arcoíris", "cycle": "Ciclo", "beat": "Al ritmo"}
+COLOR_MODES = {
+    "solid": "Sólido",
+    "rainbow": "Arcoíris",
+    "cycle": "Ciclo",
+    "beat": "Al ritmo",
+}
 MIRRORS = ("none", "h", "v", "quad")
 TEXT_MODES = ("static", "scroll")
 
@@ -29,34 +52,69 @@ CUE_SLOTS = 16
 BPM_RANGE = (40.0, 240.0)
 
 SCENE_DEFAULTS = {
-    "pattern": "circle", "text": "HOLA", "textMode": "static", "drawing": [],
-    "size": 0.6, "x": 0.0, "y": 0.0, "rotation": 0.0, "spin": 0.0, "speed": 1.0,
-    "color": "#00ff00", "colorMode": "solid", "colorSpeed": 0.5,
-    "effect": "none", "effectAmount": 0.5, "effectSpeed": 0.5, "beatSync": False,
+    "pattern": "circle",
+    "text": "HOLA",
+    "textMode": "static",
+    "drawing": [],
+    "size": 0.6,
+    "x": 0.0,
+    "y": 0.0,
+    "rotation": 0.0,
+    "spin": 0.0,
+    "speed": 1.0,
+    "color": "#00ff00",
+    "colorMode": "solid",
+    "colorSpeed": 0.5,
+    "effect": "none",
+    "effectAmount": 0.5,
+    "effectSpeed": 0.5,
+    "beatSync": False,
     "mirror": "none",
 }
 SETTINGS_DEFAULTS = {
-    "pps": 30000, "brightness": 0.3, "scanSize": 0.8,
-    "invertX": False, "invertY": False, "swapXY": False, "beamSafety": True,
+    "pps": 30000,
+    "brightness": 0.3,
+    "scanSize": 0.8,
+    "invertX": False,
+    "invertY": False,
+    "swapXY": False,
+    "beamSafety": True,
 }
 
 _SCENE_NUMBERS = {
-    "size": (0.0, 1.0), "x": (-1.0, 1.0), "y": (-1.0, 1.0), "rotation": (-180.0, 180.0),
-    "spin": (-360.0, 360.0), "speed": (0.0, 2.0), "colorSpeed": (0.0, 2.0),
-    "effectAmount": (0.0, 1.0), "effectSpeed": (0.0, 2.0),
+    "size": (0.0, 1.0),
+    "x": (-1.0, 1.0),
+    "y": (-1.0, 1.0),
+    "rotation": (-180.0, 180.0),
+    "spin": (-360.0, 360.0),
+    "speed": (0.0, 2.0),
+    "colorSpeed": (0.0, 2.0),
+    "effectAmount": (0.0, 1.0),
+    "effectSpeed": (0.0, 2.0),
 }
 _SCENE_ENUMS = {
-    "pattern": PATTERNS, "textMode": TEXT_MODES, "colorMode": COLOR_MODES,
-    "effect": EFFECTS, "mirror": MIRRORS,
+    "pattern": PATTERNS,
+    "textMode": TEXT_MODES,
+    "colorMode": COLOR_MODES,
+    "effect": EFFECTS,
+    "mirror": MIRRORS,
 }
-_SETTINGS_NUMBERS = {"pps": (1000, 65535), "brightness": (0.0, 1.0), "scanSize": (0.1, 1.0)}
+_SETTINGS_NUMBERS = {
+    "pps": (1000, 65535),
+    "brightness": (0.0, 1.0),
+    "scanSize": (0.1, 1.0),
+}
 _SETTINGS_BOOLS = ("invertX", "invertY", "swapXY", "beamSafety")
 _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def clamp_number(value, lo, hi):
     """Return ``value`` clamped to [lo, hi], or None when it is not a finite number."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+    ):
         return None
     return min(hi, max(lo, float(value)))
 
@@ -132,7 +190,10 @@ def clean_cue(cue):
     """Validate a stored cue; returns None for empty or malformed slots."""
     if not isinstance(cue, dict) or not isinstance(cue.get("name"), str):
         return None
-    return {"name": cue["name"][:MAX_CUE_NAME], "scene": merge_scene(SCENE_DEFAULTS, cue.get("scene"))}
+    return {
+        "name": cue["name"][:MAX_CUE_NAME],
+        "scene": merge_scene(SCENE_DEFAULTS, cue.get("scene")),
+    }
 
 
 def clean_cues(cues):
@@ -146,10 +207,16 @@ _DEFAULT_CUES = [
     ("Túnel arcoíris", {"pattern": "tunnel", "colorMode": "rainbow"}),
     ("Estrella giratoria", {"pattern": "star", "color": "#ffff00", "spin": 90}),
     ("Onda azul", {"pattern": "wave", "color": "#0088ff"}),
-    ("Texto HOLA", {"pattern": "text", "text": "HOLA", "textMode": "scroll", "color": "#ff00ff"}),
+    (
+        "Texto HOLA",
+        {"pattern": "text", "text": "HOLA", "textMode": "scroll", "color": "#ff00ff"},
+    ),
     ("Abanico", {"pattern": "fan", "color": "#00ffff"}),
     ("Lissajous", {"pattern": "lissajous", "colorMode": "cycle"}),
-    ("Corazón", {"pattern": "heart", "color": "#ff0000", "effect": "pulse", "beatSync": True}),
+    (
+        "Corazón",
+        {"pattern": "heart", "color": "#ff0000", "effect": "pulse", "beatSync": True},
+    ),
     ("Rejilla", {"pattern": "grid", "color": "#00ff00", "effect": "wave"}),
     ("Espiral", {"pattern": "spiral", "colorMode": "rainbow", "spin": 60}),
 ]
@@ -161,6 +228,12 @@ def default_cues():
 
 def catalog():
     """The id/name lists the UI renders."""
+
     def entries(names):
         return [{"id": k, "name": v} for k, v in names.items()]
-    return {"patterns": entries(PATTERNS), "effects": entries(EFFECTS), "colorModes": entries(COLOR_MODES)}
+
+    return {
+        "patterns": entries(PATTERNS),
+        "effects": entries(EFFECTS),
+        "colorModes": entries(COLOR_MODES),
+    }

@@ -14,9 +14,11 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
-FLAGS_SINGLE_MODE = 2          # HELIOS_FLAGS_SINGLE_MODE: play each frame once, so a stalled server goes dark
+FLAGS_SINGLE_MODE = (
+    2  # HELIOS_FLAGS_SINGLE_MODE: play each frame once, so a stalled server goes dark
+)
 USB_MAX_POINTS = 0xFFF
-STATUS_TIMEOUT = 0.1           # seconds to wait for a DAC buffer to free up
+STATUS_TIMEOUT = 0.1  # seconds to wait for a DAC buffer to free up
 _WEBAPP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _REPO = os.path.dirname(_WEBAPP)
 
@@ -25,20 +27,31 @@ _REPO = os.path.dirname(_WEBAPP)
 class DacInfo:
     index: int
     name: str
-    kind: str    # "usb" | "idn" | "sim"
+    kind: str  # "usb" | "idn" | "sim"
 
     def as_dict(self):
         return {"index": self.index, "name": self.name, "kind": self.kind}
 
 
 class HeliosPoint(ctypes.Structure):
-    _fields_ = [("x", ctypes.c_uint16), ("y", ctypes.c_uint16),
-                ("r", ctypes.c_uint8), ("g", ctypes.c_uint8), ("b", ctypes.c_uint8), ("i", ctypes.c_uint8)]
+    _fields_ = [
+        ("x", ctypes.c_uint16),
+        ("y", ctypes.c_uint16),
+        ("r", ctypes.c_uint8),
+        ("g", ctypes.c_uint8),
+        ("b", ctypes.c_uint8),
+        ("i", ctypes.c_uint8),
+    ]
 
 
 class HeliosPointHighRes(ctypes.Structure):
-    _fields_ = [("x", ctypes.c_uint16), ("y", ctypes.c_uint16),
-                ("r", ctypes.c_uint16), ("g", ctypes.c_uint16), ("b", ctypes.c_uint16)]
+    _fields_ = [
+        ("x", ctypes.c_uint16),
+        ("y", ctypes.c_uint16),
+        ("r", ctypes.c_uint16),
+        ("g", ctypes.c_uint16),
+        ("b", ctypes.c_uint16),
+    ]
 
 
 def _unit(v):
@@ -48,8 +61,13 @@ def _unit(v):
 def to_highres(points):
     buf = (HeliosPointHighRes * len(points))()
     for i, (x, y, r, g, b) in enumerate(points):
-        buf[i] = HeliosPointHighRes(round(_unit((x + 1) / 2) * 0xFFFF), round(_unit((y + 1) / 2) * 0xFFFF),
-                                    round(_unit(r) * 0xFFFF), round(_unit(g) * 0xFFFF), round(_unit(b) * 0xFFFF))
+        buf[i] = HeliosPointHighRes(
+            round(_unit((x + 1) / 2) * 0xFFFF),
+            round(_unit((y + 1) / 2) * 0xFFFF),
+            round(_unit(r) * 0xFFFF),
+            round(_unit(g) * 0xFFFF),
+            round(_unit(b) * 0xFFFF),
+        )
     return buf
 
 
@@ -57,22 +75,36 @@ def to_lowres(points):
     buf = (HeliosPoint * len(points))()
     for i, (x, y, r, g, b) in enumerate(points):
         r8, g8, b8 = round(_unit(r) * 255), round(_unit(g) * 255), round(_unit(b) * 255)
-        buf[i] = HeliosPoint(round(_unit((x + 1) / 2) * 0xFFF), round(_unit((y + 1) / 2) * 0xFFF),
-                             r8, g8, b8, 255 if (r8 or g8 or b8) else 0)
+        buf[i] = HeliosPoint(
+            round(_unit((x + 1) / 2) * 0xFFF),
+            round(_unit((y + 1) / 2) * 0xFFF),
+            r8,
+            g8,
+            b8,
+            255 if (r8 or g8 or b8) else 0,
+        )
     return buf
 
 
 def library_candidates(explicit=None):
     """Library paths in search order: --lib, $HELIOS_LIB, webapp/lib, then the SDK's prebuilt copies."""
     if sys.platform.startswith("win"):
-        names = [os.path.join(_WEBAPP, "lib", "HeliosLaserDAC.dll"),
-                 os.path.join(_REPO, "sdk", "cpp", "shared_library", "HeliosLaserDAC.dll")]
+        names = [
+            os.path.join(_WEBAPP, "lib", "HeliosLaserDAC.dll"),
+            os.path.join(_REPO, "sdk", "cpp", "shared_library", "HeliosLaserDAC.dll"),
+        ]
     elif sys.platform == "darwin":
-        names = [os.path.join(_WEBAPP, "lib", "libHeliosDacAPI.dylib"),
-                 os.path.join(_REPO, "sdk", "cpp", "shared_library", "libHeliosLaserDAC.dylib")]
+        names = [
+            os.path.join(_WEBAPP, "lib", "libHeliosDacAPI.dylib"),
+            os.path.join(
+                _REPO, "sdk", "cpp", "shared_library", "libHeliosLaserDAC.dylib"
+            ),
+        ]
     else:
-        names = [os.path.join(_WEBAPP, "lib", "libHeliosDacAPI.so"),
-                 os.path.join(_REPO, "sdk", "examples", "python", "libHeliosDacAPI.so")]
+        names = [
+            os.path.join(_WEBAPP, "lib", "libHeliosDacAPI.so"),
+            os.path.join(_REPO, "sdk", "examples", "python", "libHeliosDacAPI.so"),
+        ]
     first = [p for p in (explicit, os.environ.get("HELIOS_LIB")) if p]
     return first + names
 
@@ -129,8 +161,13 @@ class HeliosLibOutput:
         self._count = 0
         u, i, p = ctypes.c_uint, ctypes.c_int, ctypes.c_void_p
         signatures = {
-            "OpenDevices": ([], i), "CloseDevices": ([], i), "GetStatus": ([u], i), "Stop": ([u], i),
-            "SetShutter": ([u, ctypes.c_bool], i), "GetName": ([u, ctypes.c_char_p], i), "GetIsUsb": ([u], i),
+            "OpenDevices": ([], i),
+            "CloseDevices": ([], i),
+            "GetStatus": ([u], i),
+            "Stop": ([u], i),
+            "SetShutter": ([u, ctypes.c_bool], i),
+            "GetName": ([u, ctypes.c_char_p], i),
+            "GetIsUsb": ([u], i),
             "WriteFrame": ([u, i, ctypes.c_uint8, p, i], i),
             "WriteFrameHighResolution": ([u, i, ctypes.c_uint8, p, i], i),
         }
@@ -162,15 +199,26 @@ class HeliosLibOutput:
             if status < 0:
                 raise IOError(f"DAC {index}: GetStatus error {status}")
             if self._clock() >= deadline:
-                return          # buffer still full: drop this frame rather than block the loop
+                return  # buffer still full: drop this frame rather than block the loop
             self._sleep(0.0005)
         if self.highres:
             buf = to_highres(points)
-            result = self._lib.WriteFrameHighResolution(index, pps, FLAGS_SINGLE_MODE, ctypes.cast(buf, ctypes.c_void_p),
-                                                        len(points))
+            result = self._lib.WriteFrameHighResolution(
+                index,
+                pps,
+                FLAGS_SINGLE_MODE,
+                ctypes.cast(buf, ctypes.c_void_p),
+                len(points),
+            )
         else:
             buf = to_lowres(points)
-            result = self._lib.WriteFrame(index, pps, FLAGS_SINGLE_MODE, ctypes.cast(buf, ctypes.c_void_p), len(points))
+            result = self._lib.WriteFrame(
+                index,
+                pps,
+                FLAGS_SINGLE_MODE,
+                ctypes.cast(buf, ctypes.c_void_p),
+                len(points),
+            )
         if result < 0:
             raise IOError(f"DAC {index}: write error {result}")
 
@@ -206,7 +254,7 @@ class AutoOutput:
             try:
                 self.hardware.close()
                 dacs = self.hardware.open()
-            except Exception:       # a broken library must not take the app down
+            except Exception:  # a broken library must not take the app down
                 log.exception("No se pudo abrir la librería del DAC")
                 dacs = []
             if dacs:

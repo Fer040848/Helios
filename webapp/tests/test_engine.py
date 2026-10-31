@@ -4,7 +4,14 @@ import unittest
 
 from helios_web import model
 from helios_web.engine import Engine
-from helios_web.output import AutoOutput, DacInfo, HeliosLibOutput, SimulatedOutput, to_highres, to_lowres
+from helios_web.output import (
+    AutoOutput,
+    DacInfo,
+    HeliosLibOutput,
+    SimulatedOutput,
+    to_highres,
+    to_lowres,
+)
 from helios_web.store import Store
 
 
@@ -112,7 +119,9 @@ class CueTests(unittest.TestCase):
             engine, _, _ = make_engine(Store(tmp))
             self.assertTrue(engine.trigger_cue(1))
             self.assertEqual(engine.active_cue, 1)
-            self.assertEqual(engine.scene["pattern"], engine.cues[1]["scene"]["pattern"])
+            self.assertEqual(
+                engine.scene["pattern"], engine.cues[1]["scene"]["pattern"]
+            )
             engine.update_scene({"pattern": "heart", "color": "#ff0000"})
             self.assertIsNone(engine.active_cue)
             engine.save_cue(15, "Mi corazón")
@@ -147,7 +156,7 @@ class TempoTests(unittest.TestCase):
         for i in range(5):
             engine.tap(now=10.0 + i * 0.5)
         self.assertAlmostEqual(engine.bpm, 120.0)
-        engine.tap(now=20.0)                 # > 2 s later: restart, BPM unchanged by a single tap
+        engine.tap(now=20.0)  # > 2 s later: restart, BPM unchanged by a single tap
         self.assertAlmostEqual(engine.bpm, 120.0)
         engine.tap(now=20.4)
         self.assertAlmostEqual(engine.bpm, 150.0)
@@ -173,12 +182,22 @@ class FakeLib:
     def __init__(self, highres=True, statuses=(1,)):
         self.log = []
         statuses = list(statuses)
-        for name, result in (("OpenDevices", 1), ("CloseDevices", 1), ("Stop", 1), ("SetShutter", 1),
-                             ("GetName", 1), ("WriteFrame", 1)):
+        for name, result in (
+            ("OpenDevices", 1),
+            ("CloseDevices", 1),
+            ("Stop", 1),
+            ("SetShutter", 1),
+            ("GetName", 1),
+            ("WriteFrame", 1),
+        ):
             setattr(self, name, FakeFn(result, self.log, name))
-        self.GetStatus = FakeFn(lambda: statuses.pop(0) if statuses else 1, self.log, "GetStatus")
+        self.GetStatus = FakeFn(
+            lambda: statuses.pop(0) if statuses else 1, self.log, "GetStatus"
+        )
         if highres:
-            self.WriteFrameHighResolution = FakeFn(1, self.log, "WriteFrameHighResolution")
+            self.WriteFrameHighResolution = FakeFn(
+                1, self.log, "WriteFrameHighResolution"
+            )
 
 
 class OutputTests(unittest.TestCase):
@@ -190,7 +209,7 @@ class OutputTests(unittest.TestCase):
         names = [c[0] for c in lib.log]
         self.assertEqual(names.count("GetStatus"), 3)
         write = [c for c in lib.log if c[0] == "WriteFrameHighResolution"][0]
-        self.assertEqual(write[2:4], (30000, 2))   # pps, HELIOS_FLAGS_SINGLE_MODE
+        self.assertEqual(write[2:4], (30000, 2))  # pps, HELIOS_FLAGS_SINGLE_MODE
         self.assertEqual(write[5], 300)
 
     def test_old_library_falls_back_to_writeframe(self):

@@ -6,7 +6,7 @@ Each glyph is a list of polylines encoded as ``"x,y x,y ...|x,y ..."``.
 
 GLYPH_WIDTH = 4.0
 CAP_HEIGHT = 6.0
-ADVANCE = 5.0          # glyph width + letter spacing
+ADVANCE = 5.0  # glyph width + letter spacing
 SPACE_ADVANCE = 4.0
 
 _DOT = "1.8,0 2.2,0 2.2,0.4 1.8,0.4 1.8,0"
@@ -61,19 +61,25 @@ _GLYPHS = {
     "/": "0,0 4,6",
 }
 # Spanish letters: base glyph plus a diacritic stroke.
-_GLYPHS.update({
-    "Á": _GLYPHS["A"] + "|" + _ACUTE,
-    "É": _GLYPHS["E"] + "|" + _ACUTE,
-    "Í": _GLYPHS["I"] + "|" + _ACUTE,
-    "Ó": _GLYPHS["O"] + "|" + _ACUTE,
-    "Ú": _GLYPHS["U"] + "|" + _ACUTE,
-    "Ü": _GLYPHS["U"] + "|0.8,7 1.2,7 1.2,7.4 0.8,7.4 0.8,7|2.8,7 3.2,7 3.2,7.4 2.8,7.4 2.8,7",
-    "Ñ": _GLYPHS["N"] + "|0,7 1,7.7 3,7 4,7.7",
-})
+_GLYPHS.update(
+    {
+        "Á": _GLYPHS["A"] + "|" + _ACUTE,
+        "É": _GLYPHS["E"] + "|" + _ACUTE,
+        "Í": _GLYPHS["I"] + "|" + _ACUTE,
+        "Ó": _GLYPHS["O"] + "|" + _ACUTE,
+        "Ú": _GLYPHS["U"] + "|" + _ACUTE,
+        "Ü": _GLYPHS["U"]
+        + "|0.8,7 1.2,7 1.2,7.4 0.8,7.4 0.8,7|2.8,7 3.2,7 3.2,7.4 2.8,7.4 2.8,7",
+        "Ñ": _GLYPHS["N"] + "|0,7 1,7.7 3,7 4,7.7",
+    }
+)
 
 
 def _parse(spec):
-    return [[tuple(float(v) for v in pair.split(",")) for pair in line.split()] for line in spec.split("|")]
+    return [
+        [tuple(float(v) for v in pair.split(",")) for pair in line.split()]
+        for line in spec.split("|")
+    ]
 
 
 GLYPHS = {char: _parse(spec) for char, spec in _GLYPHS.items()}
