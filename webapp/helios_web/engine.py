@@ -217,8 +217,11 @@ class Engine:
         """One loop iteration: render, write when armed, pace, persist."""
         now = self._clock()
         dt = 0.0 if self._last_tick is None else now - self._last_tick
-        if dt > 0:
-            self.fps = 0.9 * self.fps + 0.1 * (1.0 / dt) if self.fps else 1.0 / dt
+        if (
+            dt > 0
+        ):  # average the period, not the rate, so one short step can't spike the reading
+            self._avg_dt = 0.9 * self._avg_dt + 0.1 * dt if self._avg_dt else dt
+            self.fps = 1.0 / self._avg_dt
         self._last_tick = now
         points, pps = self.render(dt)
         wrote = False
