@@ -64,6 +64,17 @@ class PatternTests(unittest.TestCase):
         clocks.effect = 0.9
         self.assertEqual(compose(scene(effect="strobe", effectAmount=1.0), clocks), [])
 
+    def test_drawing_maps_one_to_one_whatever_the_size(self):
+        for size in (0.3, 0.6, 1.0):
+            (st,) = compose(
+                scene(
+                    pattern="drawing", size=size, drawing=[[[0.5, 0.5], [-0.25, 0.75]]]
+                ),
+                Clocks(),
+            )
+            self.assertAlmostEqual(st.points[0][0], 0.5)
+            self.assertAlmostEqual(st.points[1][1], 0.75)
+
     def test_mirror_quad_makes_four_copies(self):
         self.assertEqual(
             len(compose(scene(pattern="circle", x=0.3, mirror="quad"), Clocks())), 4
