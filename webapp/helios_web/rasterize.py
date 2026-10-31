@@ -25,6 +25,7 @@ MIN_FRAME_SECONDS = 0.012
 MIN_POINTS = 200
 MAX_POINTS = 4095
 BEAM_SAFETY_EXTENT = 0.05
+TAIL_BLANK = 4                 # blanked points closing every DAC frame
 _JOIN_EPS = 1e-4
 
 BLANK = (0.0, 0.0, 0.0)
