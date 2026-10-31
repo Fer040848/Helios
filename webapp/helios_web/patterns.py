@@ -172,8 +172,14 @@ def text(scene, t, size):
 
 
 def drawing(scene, t, size):
+    """Drawn 1:1 with the phone canvas: undo the engine's ``size`` scaling (rotation/position/effects still apply)."""
+    if size < 0.01:
+        return []
+    k = 1.0 / size
     return [
-        Stroke([tuple(p) for p in st], False) for st in scene.get("drawing", []) if st
+        Stroke([(p[0] * k, p[1] * k) for p in st], False)
+        for st in scene.get("drawing", [])
+        if st
     ]
 
 
