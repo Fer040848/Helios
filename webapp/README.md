@@ -14,15 +14,15 @@ usarla como app.
 
 ## Funciones
 
-| Pestaña | Qué hace |
-|---------|----------|
-| **Cues** | Cuadrícula de 16 cues (presets). Toca para disparar. Modo *Guardar* para guardar la escena actual en un cue; mantén presionado un cue para renombrarlo o borrarlo. |
-| **Forma** | Círculo, cuadrado, triángulo, estrella, corazón, línea, espiral, onda, Lissajous, túnel, abanico, rejilla, flor, texto y dibujo. Tamaño, rotación, giro continuo, velocidad, posición con pad XY y espejo. |
-| **Color** | Colores rápidos, selector de color y modos: sólido, arcoíris, ciclo y al ritmo. |
-| **Efecto** | Pulso, ondulación, órbita, rebote, zoom, estrobo, vaivén y trazado. Intensidad, velocidad, BPM con botón **TAP** y sincronía al ritmo. |
-| **Texto** | Escribe un texto (también Ñ y acentos) estático o en desplazamiento. |
-| **Dibujo** | Dibuja con el dedo y se proyecta al instante. |
-| **Ajustes** | Puntos por segundo (pps), brillo máximo, área de escaneo, invertir/intercambiar ejes, protección de haz y búsqueda de DACs. |
+| Pestaña     | Qué hace                                                                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cues**    | Cuadrícula de 16 cues (presets). Toca para disparar. Modo _Guardar_ para guardar la escena actual en un cue; mantén presionado un cue para renombrarlo o borrarlo.                                         |
+| **Forma**   | Círculo, cuadrado, triángulo, estrella, corazón, línea, espiral, onda, Lissajous, túnel, abanico, rejilla, flor, texto y dibujo. Tamaño, rotación, giro continuo, velocidad, posición con pad XY y espejo. |
+| **Color**   | Colores rápidos, selector de color y modos: sólido, arcoíris, ciclo y al ritmo.                                                                                                                            |
+| **Efecto**  | Pulso, ondulación, órbita, rebote, zoom, estrobo, vaivén y trazado. Intensidad, velocidad, BPM con botón **TAP** y sincronía al ritmo.                                                                     |
+| **Texto**   | Escribe un texto (también Ñ y acentos) estático o en desplazamiento.                                                                                                                                       |
+| **Dibujo**  | Dibuja con el dedo y se proyecta al instante.                                                                                                                                                              |
+| **Ajustes** | Puntos por segundo (pps), brillo máximo, área de escaneo, invertir/intercambiar ejes, protección de haz y búsqueda de DACs.                                                                                |
 
 Sin láser conectado arranca en **modo simulador**: todo funciona igual y ves la vista previa, ideal para probar.
 
@@ -79,13 +79,13 @@ Abre en tu celular:  http://192.168.1.50:8080
 
 Opciones:
 
-| Opción | Descripción |
-|--------|-------------|
-| `--port 8080` | Puerto web |
-| `--host 0.0.0.0` | Interfaz de red (por defecto todas) |
-| `--simulate` | Fuerza el simulador aunque haya un DAC conectado |
-| `--lib RUTA` | Ruta a la librería del DAC |
-| `--data DIR` | Carpeta donde se guardan ajustes y cues (por defecto `webapp/data/`) |
+| Opción           | Descripción                                                          |
+| ---------------- | -------------------------------------------------------------------- |
+| `--port 8080`    | Puerto web                                                           |
+| `--host 0.0.0.0` | Interfaz de red (por defecto todas)                                  |
+| `--simulate`     | Fuerza el simulador aunque haya un DAC conectado                     |
+| `--lib RUTA`     | Ruta a la librería del DAC                                           |
+| `--data DIR`     | Carpeta donde se guardan ajustes y cues (por defecto `webapp/data/`) |
 
 Si el celular no carga la página, revisa que el firewall de la computadora permita conexiones entrantes
 al puerto 8080 de Python.
