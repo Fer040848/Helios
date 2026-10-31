@@ -1,0 +1,12 @@
+{
+  "name": "Helios Web Control",
+  "short_name": "Helios",
+  "description": "Control de espectáculos láser para el DAC Helios",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#05060a",
+  "theme_color": "#05060a",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
