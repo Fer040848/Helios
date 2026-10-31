@@ -127,6 +127,15 @@ class ModelTests(unittest.TestCase):
         self.assertNotIn("bogus", sc)
         self.assertEqual(len(sc["text"]), model.MAX_TEXT)
 
+    def test_lone_surrogates_trailing_newline_and_huge_numbers(self):
+        sc = model.merge_scene(model.SCENE_DEFAULTS, {"text": "A\ud800B", "color": "#ABCDEF\n", "size": 10**400})
+        self.assertEqual(sc["text"], "A?B")
+        self.assertEqual(sc["color"], "#00ff00")
+        self.assertEqual(sc["size"], model.SCENE_DEFAULTS["size"])
+        self.assertEqual(model.merge_settings(model.SETTINGS_DEFAULTS, {"pps": -(10**400)})["pps"], 30000)
+        self.assertEqual(model.clean_cue({"name": "x\udc00", "scene": {}})["name"], "x?")
+        self.assertEqual(model.merge_scene(model.SCENE_DEFAULTS, {"text": "\U0001F600"})["text"], "\U0001F600")
+
     def test_drawing_is_cleaned_and_truncated(self):
         big = [
             [[0.1, 0.1]] * 1500,

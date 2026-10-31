@@ -1,25 +1,50 @@
 // Transport selection. Served by the Python server (python -m helios_web) -> WebSocket to it. Served as a static
 // site (e.g. dac.ferchx.com) -> the in-browser engine, which drives the DAC over WebUSB (engine/local.js).
-// "?modo=usb" forces the in-browser engine.
+// static/runtime.json says {"mode": "webusb"}; the Python server answers {"mode": "server"}. Only a definite answer
+// picks a transport: a failed or slow probe retries (shown as disconnected) instead of silently falling back to the
+// simulator, which on a LAN would leave the real laser unreachable. "?modo=usb" forces the in-browser engine.
 export function connect(handlers) {
-  let impl = null;
+  let impl = null,
+    attempt = 0;
   const forced = new URLSearchParams(location.search).get("modo") === "usb";
-  // static/runtime.json says {"mode": "webusb"} on a static host; the Python server answers {"mode": "server"}.
-  const probe = forced
-    ? Promise.resolve(false)
-    : fetch("/static/runtime.json", { cache: "no-store", signal: AbortSignal.timeout(2500) })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((info) => info?.mode === "server")
-        .catch(() => false);
-  probe.then(async (hasServer) => {
-    if (hasServer) {
+
+  function probe() {
+    if (forced) return Promise.resolve("webusb");
+    // AbortController + timer rather than AbortSignal.timeout(), which older Safari (iOS 15) lacks
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = setTimeout(() => ctl?.abort(), 2500);
+    return fetch("/static/runtime.json", { cache: "no-store", signal: ctl?.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((info) => info?.mode ?? null)
+      .catch(() => null)
+      .finally(() => clearTimeout(timer));
+  }
+
+  function retry() {
+    handlers.onStatus("closed");
+    const delay = Math.min(5000, 300 * 2 ** attempt++);
+    setTimeout(() => probe().then(start), delay);
+  }
+
+  async function start(mode) {
+    if (mode === "server") {
       impl = connectSocket(handlers);
+    } else if (mode === "webusb") {
+      try {
+        const { LocalBackend } = await import("./engine/local.js");
+        const backend = new LocalBackend(handlers);
+        backend.start();
+        impl = backend;
+      } catch (err) {
+        handlers.onMessage({ type: "error", message: `No se pudo iniciar el motor: ${err?.message || err}` });
+        retry();
+      }
     } else {
-      const { LocalBackend } = await import("./engine/local.js");
-      impl = new LocalBackend(handlers);
-      impl.start();
+      retry();
     }
-  });
+  }
+
+  probe().then(start);
   return { send: (obj) => (impl ? impl.send(obj) : false) };
 }
 

@@ -110,13 +110,20 @@ _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 def clamp_number(value, lo, hi):
     """Return ``value`` clamped to [lo, hi], or None when it is not a finite number."""
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, (int, float))
-        or not math.isfinite(value)
-    ):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return min(hi, max(lo, float(value)))
+    try:
+        number = float(value)          # a huge JSON integer overflows here instead of being finite
+    except OverflowError:
+        return None
+    if not math.isfinite(number):
+        return None
+    return min(hi, max(lo, number))
+
+
+def well_formed(text):
+    """Lone UTF-16 surrogates (valid in JSON, not in UTF-8) become '?', so state always encodes."""
+    return text.encode("utf-8", "replace").decode("utf-8")
 
 
 def _clean_drawing(value):
@@ -153,9 +160,9 @@ def merge_scene(base, partial):
                 scene[key] = value
         elif key == "text":
             if isinstance(value, str):
-                scene["text"] = value[:MAX_TEXT]
+                scene["text"] = well_formed(value[:MAX_TEXT])
         elif key == "color":
-            if isinstance(value, str) and _COLOR_RE.match(value):
+            if isinstance(value, str) and _COLOR_RE.fullmatch(value):
                 scene["color"] = value.lower()
         elif key == "beatSync":
             if isinstance(value, bool):
@@ -191,7 +198,7 @@ def clean_cue(cue):
     if not isinstance(cue, dict) or not isinstance(cue.get("name"), str):
         return None
     return {
-        "name": cue["name"][:MAX_CUE_NAME],
+        "name": well_formed(cue["name"][:MAX_CUE_NAME]),
         "scene": merge_scene(SCENE_DEFAULTS, cue.get("scene")),
     }
 

@@ -95,7 +95,8 @@ class Client:
                 for text in pending:
                     try:
                         await self.ws.send_str(text)
-                    except (ConnectionError, RuntimeError):
+                    except Exception:  # a dead socket or an unsendable message ends only this client
+                        log.debug("Cliente descartado", exc_info=True)
                         return
 
 

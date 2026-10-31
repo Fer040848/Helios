@@ -110,9 +110,8 @@ class Engine:
 
     def save_cue(self, index, name):
         self._check_slot(index)
-        name = (name if isinstance(name, str) else "").strip()[
-            : model.MAX_CUE_NAME
-        ] or f"Cue {index + 1}"
+        name = model.well_formed((name if isinstance(name, str) else "").strip()[: model.MAX_CUE_NAME])
+        name = name or f"Cue {index + 1}"
         with self._lock:
             self.cues[index] = {"name": name, "scene": copy.deepcopy(self.scene)}
             self._changed(persist=True)
@@ -267,7 +266,7 @@ class Engine:
                 self._dirty = False
             try:
                 self.store.save(data)
-            except OSError:
+            except (OSError, ValueError):
                 log.exception("No se pudo guardar el estado")
                 with self._lock:
                     self._dirty = True

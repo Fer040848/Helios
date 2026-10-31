@@ -115,6 +115,27 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(state["state"]["activeCue"])
         await ws.close()
 
+    async def test_lone_surrogate_does_not_stop_broadcasts(self):
+        ws = await self.client.ws_connect("/ws")
+        await self.receive(ws, "state")
+        await ws.send_str('{"type": "scene", "scene": {"text": "A\\ud800"}}')
+        await ws.send_str('{"type": "saveCue", "index": 15, "name": "B\\udc00"}')
+        state = await self.receive(ws, "state", lambda d: d["state"]["cues"][15] is not None)
+        self.assertEqual(state["state"]["scene"]["text"], "A?")
+        self.assertEqual(state["state"]["cues"][15]["name"], "B?")
+        await ws.send_json({"type": "arm", "armed": True})
+        await self.receive(ws, "state", lambda d: d["state"]["armed"])   # still delivering after the bad text
+        await ws.close()
+
+    async def test_huge_number_keeps_the_connection(self):
+        ws = await self.client.ws_connect("/ws")
+        await self.receive(ws, "state")
+        await ws.send_str('{"type": "settings", "settings": {"pps": 1' + "0" * 400 + '}}')
+        await ws.send_json({"type": "scene", "scene": {"pattern": "heart"}})
+        state = await self.receive(ws, "state", lambda d: d["state"]["scene"]["pattern"] == "heart")
+        self.assertEqual(state["state"]["settings"]["pps"], 30000)
+        await ws.close()
+
     async def test_rescan_while_armed_is_an_error(self):
         ws = await self.client.ws_connect("/ws")
         await self.receive(ws, "state")

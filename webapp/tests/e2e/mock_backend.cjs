@@ -8,9 +8,12 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 
 // api: true mimics the Python server (/static/runtime.json says mode "server", so the page uses the WebSocket); api: false is a plain
 // static host like dac.ferchx.com (the page then runs its in-browser engine).
-function startStaticServer(root, { api = true } = {}) {
+// failRuntime: answer the first N /static/runtime.json requests with 503 (a flaky Wi-Fi / restarting server).
+function startStaticServer(root, { api = true, failRuntime = 0 } = {}) {
+  const stats = { runtimeRequests: 0 };
   const srv = http.createServer((req, res) => {
     const p = decodeURIComponent(req.url.split('?')[0]);
+    if (p === '/static/runtime.json' && stats.runtimeRequests++ < failRuntime) { res.writeHead(503); res.end(); return; }
     if (api && p === '/static/runtime.json') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"mode":"server"}'); return; }
     const rel = p === '/' ? 'index.html' : p.startsWith('/static/') ? p.slice(8) : null;
     const file = rel && path.resolve(root, rel);
@@ -18,7 +21,7 @@ function startStaticServer(root, { api = true } = {}) {
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
     fs.createReadStream(file).pipe(res);
   });
-  return new Promise((resolve) => srv.listen(0, '127.0.0.1', () => resolve({ url: `http://127.0.0.1:${srv.address().port}/`, close: () => { srv.closeAllConnections(); srv.close(); } })));
+  return new Promise((resolve) => srv.listen(0, '127.0.0.1', () => resolve({ url: `http://127.0.0.1:${srv.address().port}/`, stats, close: () => { srv.closeAllConnections(); srv.close(); } })));
 }
 
 const PATTERNS = [['circle', 'Círculo'], ['square', 'Cuadrado'], ['triangle', 'Triángulo'], ['star', 'Estrella'], ['heart', 'Corazón'], ['line', 'Línea'],

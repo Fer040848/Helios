@@ -8,8 +8,14 @@
 // raced against a deadline; a device that misses one is marked broken and the caller drops it.
 
 export const HELIOS_FILTER = { vendorId: 0x1209, productId: 0xe500 };
-const EP_BULK_OUT = 2, EP_INT_OUT = 6, EP_INT_IN = 3;
-const CMD_STOP = 0x01, CMD_SHUTTER = 0x02, CMD_STATUS = 0x03, CMD_FIRMWARE = 0x04, CMD_SDK_VERSION = 0x07;
+const EP_BULK_OUT = 2,
+  EP_INT_OUT = 6,
+  EP_INT_IN = 3;
+const CMD_STOP = 0x01,
+  CMD_SHUTTER = 0x02,
+  CMD_STATUS = 0x03,
+  CMD_FIRMWARE = 0x04,
+  CMD_SDK_VERSION = 0x07;
 const SDK_VERSION = 11;
 export const FLAGS_SINGLE_MODE = 2;
 export const USB_MAX_POINTS = 0xfff;
@@ -36,8 +42,11 @@ export function packFrame(points, pps, flags = FLAGS_SINGLE_MODE) {
   let o = 0;
   for (let i = 0; i < n; i++) {
     const [x, y, r, g, b] = points[i];
-    const xi = Math.round(unit((x + 1) / 2) * 0xfff), yi = Math.round(unit((y + 1) / 2) * 0xfff);
-    const r8 = Math.round(unit(r) * 255), g8 = Math.round(unit(g) * 255), b8 = Math.round(unit(b) * 255);
+    const xi = Math.round(unit((x + 1) / 2) * 0xfff),
+      yi = Math.round(unit((y + 1) / 2) * 0xfff);
+    const r8 = Math.round(unit(r) * 255),
+      g8 = Math.round(unit(g) * 255),
+      b8 = Math.round(unit(b) * 255);
     buf[o++] = xi >> 4;
     buf[o++] = ((xi & 0x0f) << 4) | (yi >> 8);
     buf[o++] = yi & 0xff;
@@ -76,7 +85,10 @@ export class HeliosUsbDac {
   async _deadline(promise, ms, what) {
     let timer;
     const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`El DAC no responde (${what})`)), ms);
+      timer = setTimeout(
+        () => reject(new Error(`El DAC no responde (${what})`)),
+        ms,
+      );
     });
     try {
       return await Promise.race([promise, timeout]);
@@ -89,15 +101,28 @@ export class HeliosUsbDac {
   }
 
   async _send(bytes) {
-    const res = await this._deadline(this.device.transferOut(EP_INT_OUT, new Uint8Array(bytes)), CONTROL_TIMEOUT_MS, `0x0${bytes[0].toString(16)}`);
-    if (res.status !== "ok") throw new Error(`USB control ${bytes[0]}: ${res.status}`);
+    const res = await this._deadline(
+      this.device.transferOut(EP_INT_OUT, new Uint8Array(bytes)),
+      CONTROL_TIMEOUT_MS,
+      `0x0${bytes[0].toString(16)}`,
+    );
+    if (res.status !== "ok")
+      throw new Error(`USB control ${bytes[0]}: ${res.status}`);
   }
 
   async _reply(expect) {
     for (let tries = 0; tries < 3; tries++) {
       // A reply we stopped waiting for would desync every later one; _deadline marks the device broken.
-      const res = await this._deadline(this.device.transferIn(EP_INT_IN, 32), REPLY_TIMEOUT_MS, "respuesta");
-      const data = new Uint8Array(res.data.buffer, res.data.byteOffset, res.data.byteLength);
+      const res = await this._deadline(
+        this.device.transferIn(EP_INT_IN, 32),
+        REPLY_TIMEOUT_MS,
+        "respuesta",
+      );
+      const data = new Uint8Array(
+        res.data.buffer,
+        res.data.byteOffset,
+        res.data.byteLength,
+      );
       if (data[0] === expect) return data;
     }
     throw new Error("Respuesta inesperada del DAC");
@@ -140,7 +165,11 @@ export class HeliosUsbDac {
       }
       if (!shouldSend()) return false; // checked synchronously right before the frame goes on the wire
       const frame = packFrame(points, pps);
-      const res = await this._deadline(this.device.transferOut(EP_BULK_OUT, frame), bulkTimeoutMs(frame.length), "cuadro");
+      const res = await this._deadline(
+        this.device.transferOut(EP_BULK_OUT, frame),
+        bulkTimeoutMs(frame.length),
+        "cuadro",
+      );
       if (res.status !== "ok") throw new Error(`USB frame: ${res.status}`);
       return true;
     });

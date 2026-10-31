@@ -100,6 +100,11 @@ const SETTINGS_BOOLS = ["invertX", "invertY", "swapXY", "beamSafety"];
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
+// Lone UTF-16 surrogates become "?" (as Python's encode("utf-8", "replace") does), so state always encodes.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+export const wellFormed = (s) => s.replace(LONE_SURROGATE, "?");
+export const cleanName = (s) => wellFormed([...s].slice(0, MAX_CUE_NAME).join(""));
+
 /** value clamped to [lo, hi], or null when it is not a finite number */
 export function clampNumber(value, lo, hi) {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
@@ -143,7 +148,7 @@ export function mergeScene(base, partial) {
         scene[key] = value;
     } else if (key === "text") {
       if (typeof value === "string")
-        scene.text = [...value].slice(0, MAX_TEXT).join("");
+        scene.text = wellFormed([...value].slice(0, MAX_TEXT).join(""));
     } else if (key === "color") {
       if (typeof value === "string" && COLOR_RE.test(value))
         scene.color = value.toLowerCase();
@@ -177,7 +182,7 @@ export function cleanCues(cues) {
   const out = list.map((c) =>
     c && typeof c === "object" && typeof c.name === "string"
       ? {
-          name: [...c.name].slice(0, MAX_CUE_NAME).join(""),
+          name: cleanName(c.name),
           scene: mergeScene(SCENE_DEFAULTS, c.scene),
         }
       : null,

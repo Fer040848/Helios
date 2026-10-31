@@ -32,7 +32,8 @@ Abre **https://dac.ferchx.com** en **Chrome o Edge** y la página controla el DA
 sin Python ni servidor:
 
 - **Celular Android**: conecta el Helios al teléfono con un **cable USB OTG**, abre la página, ve a **Ajustes →
-  Conectar DAC por USB** y elige el Helios. Después de la primera vez se reconecta solo.
+  Conectar DAC por USB** y elige el Helios. Como el Helios no tiene número de serie USB, Chrome no
+  recuerda el permiso: si desconectas el DAC o reinicias el navegador, vuelve a tocar **Conectar DAC por USB**.
 - **Computadora** (Windows, macOS, Linux, Chromebook): igual, con el Helios conectado por USB.
 - **iPhone / Safari / Firefox** no tienen WebUSB: ahí la página funciona solo como demo con simulador. Para usar un
   iPhone como control remoto usa la app Python de abajo en una computadora con el DAC.
