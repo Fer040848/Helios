@@ -175,23 +175,32 @@ class Engine:
                 self._safe(self.output.shutter, dac.index, True)
 
     def disarm(self):
+        # Fast path: the render loop stops sending at its next frame even while a write holds _out_lock.
         with self._lock:
             self.armed = False
             self._changed()
         with self._out_lock:
-            for dac in self.dacs:
-                self._safe(self.output.stop, dac.index)
-                self._safe(self.output.shutter, dac.index, False)
+            self._disarm_locked()
+
+    def _disarm_locked(self):
+        # Cleared again under _out_lock: an arm() that slipped in since the fast path cannot outlive this blackout.
+        with self._lock:
+            self.armed = False
+            self._changed()
+        for dac in self.dacs:
+            self._safe(self.output.stop, dac.index)
+            self._safe(self.output.shutter, dac.index, False)
 
     blackout = disarm
 
     def rescan(self):
-        if self.armed:
-            raise RuntimeError("Apaga la salida antes de buscar DACs")
-        self.disarm()
+        """Re-open the DACs. Holds _out_lock throughout, so arm() cannot interleave with the swap."""
         with self._out_lock:
-            self.output.close()
-        self.open()
+            if self.armed:
+                raise RuntimeError("Apaga la salida antes de buscar DACs")
+            self._disarm_locked()
+            self._safe(self.output.close)
+            self._open_locked()
 
     def _safe(self, fn, *args):
         try:
