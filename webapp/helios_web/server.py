@@ -20,6 +20,7 @@ STATIC_DIR = os.path.join(
 FRAME_INTERVAL = 0.05  # ~20 preview frames per second
 STATE_INTERVAL = 0.1  # state broadcasts coalesced to <= 10 per second
 MAX_PREVIEW_VERTICES = 1500
+MAX_PENDING_ERRORS = 20  # per client; older unsent errors are dropped
 
 mimetypes.add_type(
     "text/javascript", ".js"
