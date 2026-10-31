@@ -121,7 +121,13 @@ def clip(strokes, lim=1.0):
             start = (a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0) + tuple(
                 a[2:]
             )
-            end = (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1) + tuple(a[2:])
+            # An unclipped end keeps b's own colour, which colours the next segment.
+            end = (
+                tuple(b)
+                if t1 >= 1.0
+                else (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1)
+                + tuple(a[2:])
+            )
             if t0 > 0 and current:
                 out.append(ColoredStroke(current, False))
                 current = []
