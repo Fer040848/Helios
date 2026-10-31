@@ -221,6 +221,15 @@ class SafetyTests(unittest.TestCase):
         )
         self.assertEqual(strokes[0].points[0][:2], (-0.2, 0.5))
 
+    def test_every_dac_frame_ends_blanked(self):
+        for world in (compose(scene(pattern="circle"), Clocks()), compose(scene(pattern="star", size=1.0), Clocks())):
+            _, points = build_frame(world, SETTINGS)
+            self.assertFalse(lit(points[-1:]), "a frame must never end on a lit point")
+        many = [ColoredStroke([(-1.0, y / 50, 1, 1, 1), (1.0, y / 50, 1, 1, 1)], False) for y in range(-50, 50)]
+        _, points = build_frame(many, dict(SETTINGS, scanSize=1.0))
+        self.assertLessEqual(len(points), MAX_POINTS)
+        self.assertFalse(lit(points[-1:]), "a truncated frame must end blanked")
+
     def test_beam_safety_blanks_a_single_dot(self):
         dot = [ColoredStroke([(0.1, 0.1, 1, 1, 1)], False)]
         preview, points = build_frame(dot, SETTINGS)

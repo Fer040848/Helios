@@ -51,7 +51,8 @@ class Engine:
         self._last_tick = None
         self._avg_dt = 0.0
         self._dirty = False
-        self._last_persist = 0.0
+        self._persist_lock = threading.Lock()
+        self._stop_persist = threading.Event()
         self._thread = None
         self._running = False
         self._last_error_log = 0.0
@@ -252,34 +253,35 @@ class Engine:
             remaining = 1.0 / IDLE_FPS - (self._clock() - now)
             if remaining > 0:
                 self._sleep(remaining)
-        self._maybe_persist(now)
 
-    def _maybe_persist(self, now, force=False):
-        if (
-            not self.store
-            or not self._dirty
-            or (not force and now - self._last_persist < PERSIST_INTERVAL)
-        ):
-            return
-        with self._lock:
-            data = {"settings": dict(self.settings), "cues": copy.deepcopy(self.cues)}
-            self._dirty = False
-        self._last_persist = now
-        try:
-            self.store.save(data)
-        except OSError:
-            log.exception("No se pudo guardar el estado")
-
+    # ----- persistence (own thread: file I/O must never delay a frame) ---------------------------------------
     def flush(self):
-        self._maybe_persist(self._clock(), force=True)
+        """Save settings and cues if they changed. A failed save stays dirty and is retried."""
+        if not self.store:
+            return
+        with self._persist_lock:
+            with self._lock:
+                if not self._dirty:
+                    return
+                data = {"settings": dict(self.settings), "cues": copy.deepcopy(self.cues)}
+                self._dirty = False
+            try:
+                self.store.save(data)
+            except OSError:
+                log.exception("No se pudo guardar el estado")
+                with self._lock:
+                    self._dirty = True
+
+    def _persist_loop(self):
+        while not self._stop_persist.wait(PERSIST_INTERVAL):
+            self.flush()
 
     def start(self):
         self.open()
         self._running = True
-        self._thread = threading.Thread(
-            target=self._run, name="helios-render", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="helios-render", daemon=True)
         self._thread.start()
+        threading.Thread(target=self._persist_loop, name="helios-persist", daemon=True).start()
 
     def _run(self):
         while self._running:
@@ -292,6 +294,7 @@ class Engine:
     def shutdown(self):
         """Stop output, close the shutter and the DACs, persist."""
         self._running = False
+        self._stop_persist.set()
         self.disarm()
         if self._thread:
             self._thread.join(timeout=2.0)

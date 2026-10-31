@@ -1,5 +1,7 @@
 import ctypes
 import tempfile
+import threading
+import time
 import unittest
 
 from helios_web import model
@@ -24,6 +26,7 @@ class FakeOutput:
         self.calls = []
 
     def open(self):
+        self.calls.append(("open",))
         return [DacInfo(i, f"DAC {i}", "sim") for i in range(self.n)]
 
     def write(self, index, points, pps):
@@ -111,6 +114,99 @@ class SafetyEngineTests(unittest.TestCase):
         engine.shutdown()
         self.assertFalse(engine.armed)
         self.assertIn(("close",), out.calls)
+
+
+class RaceTests(unittest.TestCase):
+    def last_shutter(self, out, index=0):
+        return [c[2] for c in out.calls if c[0] == "shutter" and c[1] == index][-1]
+
+    def test_arm_during_blackout_leaves_consistent_state(self):
+        engine, out, _ = make_engine(dacs=1)
+        engine.arm(True)
+        gate, entered = threading.Event(), threading.Event()
+        original = engine._changed
+        blackout_thread = threading.Thread(target=engine.blackout)
+
+        def paused_changed(persist=False):
+            if threading.current_thread() is blackout_thread and not entered.is_set():
+                entered.set()
+                gate.wait(2)            # pause blackout right after it cleared `armed`
+            original(persist)
+
+        engine._changed = paused_changed
+        blackout_thread.start()
+        self.assertTrue(entered.wait(2))
+        arm_thread = threading.Thread(target=engine.arm, args=(True,))
+        arm_thread.start()
+        time.sleep(0.1)
+        gate.set()
+        blackout_thread.join(2)
+        arm_thread.join(2)
+        self.assertEqual(engine.armed, self.last_shutter(out), "armed flag and shutter must agree")
+        if not engine.armed:
+            before = len(out.writes())
+            engine.step()
+            self.assertEqual(len(out.writes()), before)
+
+    def test_arm_during_rescan_opens_shutter_on_new_handles(self):
+        engine, out, _ = make_engine(dacs=1)
+        gate, entered = threading.Event(), threading.Event()
+        original_open = engine.open
+        rescan_thread = threading.Thread(target=engine.rescan)
+
+        def paused_open():
+            if threading.current_thread() is rescan_thread:
+                entered.set()
+                gate.wait(2)
+            original_open()
+
+        engine.open = paused_open
+        rescan_thread.start()
+        entered.wait(0.5)               # only reached when rescan re-opens through engine.open
+        arm_thread = threading.Thread(target=engine.arm, args=(True,))
+        arm_thread.start()
+        time.sleep(0.1)
+        gate.set()
+        rescan_thread.join(2)
+        arm_thread.join(2)
+        last_open = max(i for i, c in enumerate(out.calls) if c == ("open",))
+        if engine.armed:
+            self.assertIn(("shutter", 0, True), out.calls[last_open:], "shutter must open on the re-opened DAC")
+
+
+class PersistTests(unittest.TestCase):
+    class FlakyStore:
+        def __init__(self):
+            self.fail, self.saved = True, []
+
+        def load(self):
+            return {}
+
+        def save(self, data):
+            if self.fail:
+                self.fail = False
+                raise OSError("disk full")
+            self.saved.append(data)
+
+    def test_render_thread_does_no_file_io(self):
+        store = self.FlakyStore()
+        store.fail = False
+        engine, _, clock = make_engine(store)
+        engine.update_settings({"brightness": 0.4})
+        clock.t += 10
+        engine.step()
+        self.assertEqual(store.saved, [])
+        engine.flush()
+        self.assertEqual(store.saved[-1]["settings"]["brightness"], 0.4)
+
+    def test_failed_save_is_retried(self):
+        store = self.FlakyStore()
+        engine, _, _ = make_engine(store)
+        engine.update_settings({"brightness": 0.4})
+        engine.flush()
+        self.assertEqual(store.saved, [])
+        engine.flush()
+        self.assertEqual(store.saved[-1]["settings"]["brightness"], 0.4)
 
 
 class CueTests(unittest.TestCase):
