@@ -68,7 +68,7 @@ export class HeliosUsbDac {
     this.device = device;
     this.index = index;
     // The firmware has no USB serial string and the name command (0x05) is not used (see open()), so number them.
-    this.name = `${device.productName || "Helios"} #${index + 1}`;
+    this.name = device.productName || "Helios"; // numbered by the backend when added (no USB serial number)
     this.kind = "usb";
     this.broken = false;
     this._chain = Promise.resolve();
@@ -141,8 +141,8 @@ export class HeliosUsbDac {
       await this._send([CMD_SDK_VERSION, SDK_VERSION]);
       // The firmware keeps its shutter pin until told otherwise: a session that died while armed may have left it
       // open. Start every session in the known-safe state (the app always starts disarmed).
-      await this._send([CMD_STOP, 0]);
       await this._send([CMD_SHUTTER, 0]);
+      await this._send([CMD_STOP, 0]);
       // The DAC-name command (0x05) is skipped on purpose: WebUSB cannot cancel a read, so a firmware that ignores
       // it would leave a pending read that swallows the next status reply.
     });

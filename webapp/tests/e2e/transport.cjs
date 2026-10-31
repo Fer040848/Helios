@@ -56,6 +56,22 @@ const cuesShown = (page) => page.waitForFunction(() => document.querySelectorAll
     await blocked.goto(statik.url);
     await cuesShown(blocked);
     assert((await blocked.locator('#dac').textContent()) === 'SIMULADOR', 'in-browser engine starts with storage blocked');
+    // 4. Static site on a slow link: every runtime.json answer takes 3 s (longer than the first probe timeout).
+    const slow = await (await browser.newContext()).newPage();
+    let slowProbes = 0;
+    await slow.route('**/static/runtime.json', async (route) => { slowProbes++; await sleep(3000); await route.continue(); });
+    await slow.goto(statik.url);
+    await slow.waitForFunction(() => document.querySelectorAll('#patterns button').length === 15, null, { timeout: 30000 });
+    assert(slowProbes >= 2 && (await slow.locator('#dac').textContent()) === 'SIMULADOR', `slow link still starts (probe timeout grows; ${slowProbes} probes)`);
+
+    // 5. Static site where the first load of the engine module fails (flaky mobile data).
+    const flakyEngine = await (await browser.newContext()).newPage();
+    let engineLoads = 0;
+    await flakyEngine.route('**/static/engine/local.js', (route) => (engineLoads++ === 0 ? route.abort('failed') : route.continue()));
+    await flakyEngine.goto(statik.url);
+    await flakyEngine.waitForFunction(() => document.querySelectorAll('#patterns button').length === 15, null, { timeout: 20000 });
+    assert(engineLoads >= 2, `a failed engine load reloads the page once and recovers (${engineLoads} loads)`);
+    assert(!flakyEngine.url().includes('recarga'), 'the reload marker is removed from the URL afterwards');
     console.log('TRANSPORT OK');
   } catch (e) {
     console.error(e.message);

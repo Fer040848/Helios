@@ -67,7 +67,7 @@ test("a freshly opened DAC is put in Stop + shutter-closed", async () => {
   const { backend } = makeBackend({ devices: [dev] });
   backend.start();
   await until(() => backend.usbDacs.length === 1);
-  assert.deepEqual(dev.controls(), [[4, 0], [7, 11], [1, 0], [2, 0]]);
+  assert.deepEqual(dev.controls(), [[4, 0], [7, 11], [2, 0], [1, 0]]);
   await backend.stop();
 });
 
@@ -82,7 +82,7 @@ test("a DAC dropped because it stopped answering still gets Stop + shutter-close
   await until(() => backend.usbDacs.length === 0, 3000);
   await until(() => dev.log.at(-1)[0] === "close");
   assert.equal(backend.armed, false);
-  assert.deepEqual(dev.afterLastStatus(), [[1, 0], [2, 0], "close"]);
+  assert.deepEqual(dev.afterLastStatus(), [[2, 0], [1, 0], "close"]);
   assert.equal(errors().filter((e) => /DAC/.test(e)).length, 1);
   await backend.stop();
 });
@@ -116,7 +116,7 @@ test("blackout during a status poll: the queued frame is never sent", async () =
   dev.busy = false; // buffer frees right after the blackout tap
   await sleep(250);
   assert.equal(dev.frames(), 0, "no frame after blackout");
-  assert.deepEqual(dev.controls().slice(-2), [[1, 0], [2, 0]]);
+  assert.deepEqual(dev.controls().slice(-2), [[2, 0], [1, 0]]);
   await backend.stop();
 });
 
@@ -132,7 +132,7 @@ test("plugging a DAC in while armed blacks out with a message and leaves the new
   assert.match(errors().at(-1), /Se conectó un DAC/);
   await sleep(50);
   assert.equal(dev.frames(), 0);
-  assert.deepEqual(dev.controls().slice(-2), [[1, 0], [2, 0]]);
+  assert.deepEqual(dev.controls().slice(-2), [[2, 0], [1, 0]]);
   await backend.stop();
 });
 
@@ -200,4 +200,84 @@ test("lone surrogates become '?' in text and cue names (same as Python)", () => 
   assert.equal(model.cleanCues([{ name: "x\udc00", scene: {} }])[0].name, "x?");
   assert.equal(model.mergeScene(model.SCENE_DEFAULTS, { text: "😀" }).text, "😀");
   assert.equal(model.mergeScene(model.SCENE_DEFAULTS, { color: "#ABCDEF\n" }).color, "#00ff00");
+});
+
+// ----- second review round ---------------------------------------------------------------------------------
+class WedgeableHelios extends FakeHelios {
+  transferOut(ep, data) {
+    if (ep === 6 && this.wedgeControl) return new Promise(() => {}); // control endpoint NAKs forever
+    return super.transferOut(ep, data);
+  }
+}
+
+test("a DAC that does not confirm the blackout is dropped with a warning, not left looking healthy", async () => {
+  const a = new FakeHelios(), b = new WedgeableHelios();
+  const { backend, errors } = makeBackend({ devices: [a, b] });
+  backend.start();
+  await until(() => backend.usbDacs.length === 2);
+  backend.send({ type: "arm", armed: true });
+  await until(() => a.frames() > 2 && b.frames() > 2);
+  b.wedgeControl = true;
+  backend.send({ type: "blackout" });
+  await until(() => backend.usbDacs.length === 1, 3000);
+  assert.equal(backend.usbDacs[0].device, a);
+  assert.equal(backend.armed, false);
+  assert.ok(errors().some((e) => /no confirmó el apagado/.test(e)), errors().join(" | "));
+  await backend.stop();
+});
+
+test("a DAC that does not confirm arming is dropped and the output stays off", async () => {
+  const dev = new WedgeableHelios();
+  const { backend, errors } = makeBackend({ devices: [dev] });
+  backend.start();
+  await until(() => backend.usbDacs.length === 1);
+  dev.wedgeControl = true;
+  backend.send({ type: "arm", armed: true });
+  await until(() => backend.usbDacs.length === 0, 3000);
+  assert.equal(backend.armed, false);
+  assert.match(errors().at(-1), /no respondió al encender/);
+  await backend.stop();
+});
+
+test("DAC names are unique and stable, also when added together or after an unplug", async () => {
+  const a = new FakeHelios(), b = new FakeHelios(), c = new FakeHelios();
+  const { backend, usb } = makeBackend({ devices: [a, b] });
+  backend.start();
+  await until(() => backend.usbDacs.length === 2);
+  const names = backend.usbDacs.map((d) => d.name);
+  assert.equal(new Set(names).size, 2, names.join(", "));
+  usb.listeners.disconnect({ device: a });
+  usb.listeners.connect({ device: c });
+  await until(() => backend.usbDacs.length === 2);
+  const after = backend.getState().dacs.map((d) => d.name);
+  assert.equal(new Set(after).size, 2, after.join(", "));
+  assert.ok(after.includes(names[1]), "the remaining DAC keeps its name");
+  await backend.stop();
+});
+
+test("a stored blob with Object.prototype keys does not stop the app from starting", () => {
+  const blob = JSON.stringify({ settings: { toString: 1, constructor: 2, brightness: 0.5 }, cues: [{ name: "a", scene: { constructor: 1, hasOwnProperty: 2, pattern: "star" } }] });
+  const storage = { getItem: () => blob, setItem() {} };
+  const backend = new LocalBackend({ onMessage: () => {}, onStatus: () => {}, usb: null, storage, doc: null });
+  assert.equal(backend.settings.brightness, 0.5);
+  assert.equal(backend.cues[0].scene.pattern, "star");
+  assert.equal(Object.prototype.hasOwnProperty.call(backend.settings, "toString"), false);
+});
+
+test("the published JS avoids features missing from older phones (Safari 15)", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const dir = new URL("../../static/", import.meta.url);
+  const files = [...readdirSync(dir).filter((f) => f.endsWith(".js")), ...readdirSync(new URL("engine/", dir)).map((f) => `engine/${f}`)];
+  const banned = [
+    [/\(\?<[=!]/, "regex lookbehind (Safari 16.4)"],
+    [/AbortSignal\.timeout/, "AbortSignal.timeout (Safari 16)"],
+    [/Object\.hasOwn\(/, "Object.hasOwn (Safari 15.4)"],
+    [/\.at\(/, "Array/String .at() (Safari 15.4)"],
+    [/structuredClone|findLast|toWellFormed/, "newer built-ins"],
+  ];
+  for (const f of files) {
+    const code = readFileSync(new URL(f, dir), "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    for (const [re, what] of banned) assert.ok(!re.test(code), `${f} uses ${what}`);
+  }
+  assert.ok(files.length >= 9);
 });

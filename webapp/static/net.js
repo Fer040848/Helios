@@ -6,13 +6,15 @@
 export function connect(handlers) {
   let impl = null,
     attempt = 0;
-  const forced = new URLSearchParams(location.search).get("modo") === "usb";
+  const params = new URLSearchParams(location.search);
+  const forced = params.get("modo") === "usb";
 
   function probe() {
     if (forced) return Promise.resolve("webusb");
     // AbortController + timer rather than AbortSignal.timeout(), which older Safari (iOS 15) lacks
     const ctl = typeof AbortController === "function" ? new AbortController() : null;
-    const timer = setTimeout(() => ctl?.abort(), 2500);
+    // the timeout grows with each attempt, so a slow but working link still gets a definite answer
+    const timer = setTimeout(() => ctl?.abort(), Math.min(20000, 2500 * 2 ** attempt));
     return fetch("/static/runtime.json", { cache: "no-store", signal: ctl?.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((info) => info?.mode ?? null)
@@ -35,9 +37,24 @@ export function connect(handlers) {
         const backend = new LocalBackend(handlers);
         backend.start();
         impl = backend;
+        if (params.has("recarga")) {
+          params.delete("recarga");
+          const query = params.toString();
+          history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+        }
       } catch (err) {
-        handlers.onMessage({ type: "error", message: `No se pudo iniciar el motor: ${err?.message || err}` });
-        retry();
+        // A module that failed to load stays failed for this document, so retrying here can never work.
+        // Reload once (nothing is connected yet, no DAC is open); after that, ask the user.
+        handlers.onStatus("closed");
+        if (!params.has("recarga")) {
+          handlers.onMessage({ type: "error", message: "No se pudo cargar la app. Recargando…" });
+          params.set("recarga", "1");
+          setTimeout(() => location.replace(`${location.pathname}?${params}${location.hash}`), 1500);
+        } else {
+          const message = `No se pudo cargar la app (${err?.message || err}). Revisa la conexión y recarga la página.`;
+          handlers.onMessage({ type: "error", message });
+          setInterval(() => handlers.onMessage({ type: "error", message }), 6000);
+        }
       }
     } else {
       retry();

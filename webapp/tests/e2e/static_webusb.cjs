@@ -102,7 +102,7 @@ const FAKE_USB = () => {
     await sleep(200);
     const log = await usb();
     const controls = log.filter((e) => e.ep === 6).map((e) => [e.b0, e.b1]);
-    assert(JSON.stringify(controls.slice(-2)) === JSON.stringify([[1, 0], [2, 0]]), 'blackout sends Stop then closes the shutter');
+    assert(JSON.stringify(controls.slice(-2)) === JSON.stringify([[2, 0], [1, 0]]), 'blackout closes the shutter, then sends Stop');
     const count = log.filter((e) => e.ep === 2).length;
     await sleep(300);
     assert((await usb()).filter((e) => e.ep === 2).length === count, 'no frames after blackout');

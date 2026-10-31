@@ -285,7 +285,11 @@ export class LocalBackend {
         else this.wakeLock = lock;
       })
       .catch(() => {});
-    return Promise.all(this.dacs.map((d) => d.shutter(true).catch(() => {})));
+    return Promise.all(
+      this.dacs.map((d) =>
+        d.shutter(true).catch(() => this._dropIfListed(d, "El DAC no respondió al encender la salida.")),
+      ),
+    );
   }
 
   disarm() {
@@ -293,14 +297,26 @@ export class LocalBackend {
     this._changed();
     this.wakeLock?.release().catch(() => {});
     this.wakeLock = null;
-    return Promise.all(this.dacs.map((d) => this._blackoutDac(d)));
+    return Promise.all(
+      this.dacs.map((d) =>
+        this._blackoutDac(d).then((ok) => {
+          // never leave an unconfirmed blackout looking healthy: drop the DAC (retries, closes) and say so
+          if (!ok) this._dropIfListed(d, "El DAC no confirmó el apagado: si el láser sigue encendido, corta su alimentación.");
+        }),
+      ),
+    );
   }
 
+  /** Shutter first: if an abandoned frame still lands, it plays with the shutter closed. Resolves to "confirmed". */
   _blackoutDac(dac) {
-    return Promise.all([
-      dac.stop().catch(() => {}),
-      dac.shutter(false).catch(() => {}),
-    ]);
+    return Promise.all([dac.shutter(false), dac.stop()]).then(
+      () => true,
+      () => false,
+    );
+  }
+
+  _dropIfListed(dac, message) {
+    if (dac !== this.sim && this.usbDacs.includes(dac)) this._dropDac(dac, message);
   }
 
   /** Ask the browser for a Helios DAC (needs the user's tap, so it is called synchronously from send()). */
@@ -339,6 +355,8 @@ export class LocalBackend {
     // slip in between the check and the change.
     const wasArmed = this.armed;
     this.armed = false;
+    this.dacCounter = (this.dacCounter || 0) + 1;
+    dac.name = `${dac.name} #${this.dacCounter}`; // stable, unique for this session
     this.usbDacs.push(dac);
     if (wasArmed) {
       this.disarm();

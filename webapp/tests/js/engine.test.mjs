@@ -101,7 +101,7 @@ test("disarmed writes no frames; armed writes SINGLE_MODE frames; blackout stops
   await sleep(100);
   const after = dev.frames().length;
   const tail = dev.controls().slice(-2);
-  assert.deepEqual(tail, [[0x01, 0], [0x02, 0]], "Stop then shutter closed");
+  assert.deepEqual(tail, [[0x02, 0], [0x01, 0]], "shutter closed, then Stop");
   await sleep(150);
   assert.equal(dev.frames().length, after, "no frames after blackout");
   assert.ok(messages.some((m) => m.type === "frame" && m.strokes.length));

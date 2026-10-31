@@ -101,8 +101,11 @@ const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 // Lone UTF-16 surrogates become "?" (as Python's encode("utf-8", "replace") does), so state always encodes.
-const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
-export const wellFormed = (s) => s.replace(LONE_SURROGATE, "?");
+// No lookbehind (unsupported before Safari 16.4): match a pair or any single surrogate, keep the pairs.
+const SURROGATES = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g;
+export const wellFormed = (s) => s.replace(SURROGATES, (m) => (m.length === 2 ? m : "?"));
+// own keys only: a stored "constructor" / "toString" / "__proto__" key must not match Object.prototype
+const own = (table, key) => Object.prototype.hasOwnProperty.call(table, key);
 export const cleanName = (s) => wellFormed([...s].slice(0, MAX_CUE_NAME).join(""));
 
 /** value clamped to [lo, hi], or null when it is not a finite number */
@@ -140,10 +143,10 @@ export function mergeScene(base, partial) {
   if (!partial || typeof partial !== "object" || Array.isArray(partial))
     return scene;
   for (const [key, value] of Object.entries(partial)) {
-    if (key in SCENE_NUMBERS) {
+    if (own(SCENE_NUMBERS, key)) {
       const n = clampNumber(value, ...SCENE_NUMBERS[key]);
       if (n !== null) scene[key] = n;
-    } else if (key in SCENE_ENUMS) {
+    } else if (own(SCENE_ENUMS, key)) {
       if (typeof value === "string" && SCENE_ENUMS[key].includes(value))
         scene[key] = value;
     } else if (key === "text") {
@@ -167,7 +170,7 @@ export function mergeSettings(base, partial) {
   if (!partial || typeof partial !== "object" || Array.isArray(partial))
     return settings;
   for (const [key, value] of Object.entries(partial)) {
-    if (key in SETTINGS_NUMBERS) {
+    if (own(SETTINGS_NUMBERS, key)) {
       const n = clampNumber(value, ...SETTINGS_NUMBERS[key]);
       if (n !== null) settings[key] = key === "pps" ? Math.round(n) : n;
     } else if (SETTINGS_BOOLS.includes(key) && typeof value === "boolean") {
