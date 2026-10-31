@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#05060a">
+  <meta name="color-scheme" content="dark">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Helios">
+  <title>Helios Web Control</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body class="offline">
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand" aria-label="Helios Web Control">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4M5.3 5.3l2.8 2.8M15.9 15.9l2.8 2.8M18.7 5.3l-2.8 2.8M8.1 15.9l-2.8 2.8"/></svg>
+      <span>HELIOS</span>
+    </div>
+    <div class="status">
+      <span id="conn" class="conn" role="status" aria-live="polite"><i class="dot" aria-hidden="true"></i><span id="conn-label">Conectando…</span></span>
+      <span id="dac" class="badge" title="Salida">—</span>
+      <span class="stats" aria-label="Rendimiento"><b id="fps">0</b>&thinsp;fps <span class="sep">·</span> <b id="pts">0</b>&thinsp;pts</span>
+    </div>
+  </header>
+
+  <section class="stage">
+    <div id="banner" class="banner" role="alert" hidden>Desconectado — reconectando…</div>
+    <div class="preview-wrap" id="preview-wrap">
+      <canvas id="preview" role="img" aria-label="Vista previa de la salida láser"></canvas>
+      <span class="live-tag" aria-hidden="true">EN VIVO</span>
+    </div>
+    <button id="arm" class="arm" type="button" aria-label="Mantén pulsado para emitir">
+      <span class="arm-fill" aria-hidden="true"></span>
+      <span class="arm-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg></span>
+      <span class="arm-label" id="arm-label">MANTÉN PARA EMITIR</span>
+    </button>
+  </section>
+
+  <main class="panel" id="panel">
+
+    <!-- Cues -->
+    <section class="page" id="page-cues" role="tabpanel" aria-labelledby="tab-cues" data-page="cues">
+      <div class="page-head">
+        <h2>Cues</h2>
+        <button id="save-mode" class="pill" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+          <span>Guardar</span>
+        </button>
+      </div>
+      <p class="hint" id="save-hint" hidden>Modo guardar: toca una ranura para guardar la escena en vivo.</p>
+      <div class="cue-grid" id="cue-grid" aria-label="Cues"></div>
+      <p class="hint small">Mantén pulsado un cue para renombrarlo o borrarlo.</p>
+    </section>
+
+    <!-- Forma -->
+    <section class="page" id="page-shape" role="tabpanel" aria-labelledby="tab-shape" data-page="shape" hidden>
+      <h3>Patrón</h3>
+      <div class="chips glyph-chips" id="patterns" data-key="scene.pattern" data-list="patterns" role="radiogroup" aria-label="Patrón"></div>
+      <h3>Transformación</h3>
+      <label class="slider" data-key="scene.size" data-fmt="pct"><span class="sl-head"><span>Tamaño</span><output></output></span><input type="range" min="0" max="1" step="0.01" aria-label="Tamaño"></label>
+      <label class="slider" data-key="scene.rotation" data-fmt="deg"><span class="sl-head"><span>Rotación</span><output></output></span><input type="range" min="-180" max="180" step="1" aria-label="Rotación"></label>
+      <label class="slider" data-key="scene.spin" data-fmt="dps"><span class="sl-head"><span>Giro</span><output></output></span><input type="range" min="-360" max="360" step="1" aria-label="Giro"></label>
+      <label class="slider" data-key="scene.speed" data-fmt="pct"><span class="sl-head"><span>Velocidad</span><output></output></span><input type="range" min="0" max="2" step="0.01" aria-label="Velocidad"></label>
+      <h3>Posición <span class="h-note">doble toque para centrar</span></h3>
+      <div class="xy-wrap">
+        <div class="xy-pad" id="xy-pad" role="application" aria-label="Posición X Y">
+          <i class="xy-h" aria-hidden="true"></i><i class="xy-v" aria-hidden="true"></i>
+          <span class="xy-dot" id="xy-dot" aria-hidden="true"></span>
+        </div>
+        <output class="xy-read" id="xy-read">X 0.00 · Y 0.00</output>
+      </div>
+      <h3>Espejo</h3>
+      <div class="seg" data-key="scene.mirror" role="radiogroup" aria-label="Espejo">
+        <button type="button" role="radio" data-value="none">Ninguno</button>
+        <button type="button" role="radio" data-value="h">Horizontal</button>
+        <button type="button" role="radio" data-value="v">Vertical</button>
+        <button type="button" role="radio" data-value="quad">Cuádruple</button>
+      </div>
+    </section>
+
+    <!-- Color -->
+    <section class="page" id="page-color" role="tabpanel" aria-labelledby="tab-color" data-page="color" hidden>
+      <h3>Color base</h3>
+      <div class="swatches" id="swatches" role="radiogroup" aria-label="Color base">
+        <button type="button" role="radio" data-color="#ff0000" style="--sw:#ff0000" aria-label="Rojo"></button>
+        <button type="button" role="radio" data-color="#00ff00" style="--sw:#00ff00" aria-label="Verde"></button>
+        <button type="button" role="radio" data-color="#0000ff" style="--sw:#2a4bff" aria-label="Azul"></button>
+        <button type="button" role="radio" data-color="#ffff00" style="--sw:#ffff00" aria-label="Amarillo"></button>
+        <button type="button" role="radio" data-color="#00ffff" style="--sw:#00ffff" aria-label="Cian"></button>
+        <button type="button" role="radio" data-color="#ff00ff" style="--sw:#ff00ff" aria-label="Magenta"></button>
+        <button type="button" role="radio" data-color="#ffffff" style="--sw:#ffffff" aria-label="Blanco"></button>
+        <button type="button" role="radio" data-color="#ff8000" style="--sw:#ff8000" aria-label="Naranja"></button>
+      </div>
+      <label class="custom-color">
+        <span class="cc-preview" id="cc-preview" aria-hidden="true"></span>
+        <span class="cc-text"><span>Personalizado</span><output id="cc-hex">#00ff00</output></span>
+        <input type="color" id="color-input" value="#00ff00" aria-label="Color personalizado">
+      </label>
+      <h3>Modo de color</h3>
+      <div class="seg wrap" id="color-modes" data-key="scene.colorMode" data-list="colorModes" role="radiogroup" aria-label="Modo de color"></div>
+      <label class="slider" data-key="scene.colorSpeed" data-fmt="pct"><span class="sl-head"><span>Velocidad del color</span><output></output></span><input type="range" min="0" max="2" step="0.01" aria-label="Velocidad del color"></label>
+    </section>
+
+    <!-- Efecto -->
+    <section class="page" id="page-fx" role="tabpanel" aria-labelledby="tab-fx" data-page="fx" hidden>
+      <h3>Efecto</h3>
+      <div class="chips" id="effects" data-key="scene.effect" data-list="effects" role="radiogroup" aria-label="Efecto"></div>
+      <label class="slider" data-key="scene.effectAmount" data-fmt="pct"><span class="sl-head"><span>Intensidad</span><output></output></span><input type="range" min="0" max="1" step="0.01" aria-label="Intensidad del efecto"></label>
+      <label class="slider" id="fx-speed" data-key="scene.effectSpeed" data-fmt="pct"><span class="sl-head"><span>Velocidad del efecto</span><output></output></span><input type="range" min="0" max="2" step="0.01" aria-label="Velocidad del efecto"></label>
+      <label class="switch-row"><span><span>Sincronizar con el ritmo</span><small>La velocidad del efecto sigue el BPM</small></span><input type="checkbox" role="switch" data-key="scene.beatSync"><i class="switch" aria-hidden="true"></i></label>
+      <h3>Tempo</h3>
+      <div class="bpm-card">
+        <div class="bpm-read"><output id="bpm-value">120</output><span>BPM</span></div>
+        <div class="bpm-row">
+          <button type="button" class="round" id="bpm-minus" aria-label="Bajar BPM">−</button>
+          <button type="button" class="tap" id="tap" aria-label="Marcar tempo">TAP</button>
+          <button type="button" class="round" id="bpm-plus" aria-label="Subir BPM">+</button>
+        </div>
+        <label class="slider" data-key="bpm" data-fmt="bpm"><span class="sl-head"><span>BPM</span><output></output></span><input type="range" min="40" max="240" step="1" aria-label="BPM"></label>
+      </div>
+    </section>
+
+    <!-- Texto -->
+    <section class="page" id="page-text" role="tabpanel" aria-labelledby="tab-text" data-page="text" hidden>
+      <h3>Texto <span class="h-note" id="text-count">0/64</span></h3>
+      <input type="text" id="text-input" class="text-input" maxlength="64" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" aria-label="Texto a proyectar" placeholder="ESCRIBE AQUÍ">
+      <h3>Modo</h3>
+      <div class="seg" data-key="scene.textMode" role="radiogroup" aria-label="Modo de texto">
+        <button type="button" role="radio" data-value="static">Fijo</button>
+        <button type="button" role="radio" data-value="scroll">Desplazar</button>
+      </div>
+      <label class="slider" data-key="scene.speed" data-fmt="pct"><span class="sl-head"><span>Velocidad</span><output></output></span><input type="range" min="0" max="2" step="0.01" aria-label="Velocidad del texto"></label>
+    </section>
+
+    <!-- Dibujo -->
+    <section class="page" id="page-draw" role="tabpanel" aria-labelledby="tab-draw" data-page="draw" hidden>
+      <h3>Dibujo <span class="h-note" id="draw-count">0 / 2000 puntos</span></h3>
+      <div class="draw-wrap">
+        <canvas id="draw" class="draw-canvas" aria-label="Lienzo de dibujo: dibuja con el dedo"></canvas>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="draw-undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Deshacer</button>
+        <button type="button" class="btn danger" id="draw-clear"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Borrar</button>
+      </div>
+    </section>
+
+    <!-- Ajustes -->
+    <section class="page" id="page-settings" role="tabpanel" aria-labelledby="tab-settings" data-page="settings" hidden>
+      <h3>Salida</h3>
+      <label class="slider safety" data-key="settings.brightness" data-fmt="pct"><span class="sl-head"><span>Brillo maestro <small>límite de seguridad de toda la salida</small></span><output></output></span><input type="range" min="0" max="1" step="0.01" aria-label="Brillo maestro (límite de seguridad)"></label>
+      <label class="slider" data-key="settings.scanSize" data-fmt="pct"><span class="sl-head"><span>Área de escaneo</span><output></output></span><input type="range" min="0.1" max="1" step="0.01" aria-label="Área de escaneo"></label>
+      <label class="slider" data-key="settings.pps" data-fmt="pps"><span class="sl-head"><span>Puntos por segundo</span><output></output></span><input type="range" min="1000" max="65535" step="5" aria-label="Puntos por segundo"></label>
+      <h3>Orientación del proyector</h3>
+      <label class="switch-row"><span>Invertir X</span><input type="checkbox" role="switch" data-key="settings.invertX" id="invert-x"><i class="switch" aria-hidden="true"></i></label>
+      <label class="switch-row"><span>Invertir Y</span><input type="checkbox" role="switch" data-key="settings.invertY"><i class="switch" aria-hidden="true"></i></label>
+      <label class="switch-row"><span>Intercambiar X/Y</span><input type="checkbox" role="switch" data-key="settings.swapXY"><i class="switch" aria-hidden="true"></i></label>
+      <h3>Seguridad</h3>
+      <label class="switch-row"><span><span>Seguridad de haz</span><small>Apaga los fotogramas con el haz casi quieto</small></span><input type="checkbox" role="switch" data-key="settings.beamSafety"><i class="switch" aria-hidden="true"></i></label>
+      <h3>DAC</h3>
+      <ul class="dac-list" id="dac-list"></ul>
+      <button type="button" class="btn wide" id="rescan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg><span>Buscar DAC</span></button>
+      <p class="hint small" id="rescan-hint">Solo disponible con la emisión apagada.</p>
+      <div class="safety-note" role="note">
+        <strong>Seguridad</strong>
+        Nunca apuntes el láser a personas, animales, vehículos ni aviones, ni a superficies reflectantes.
+        Empieza con el brillo maestro bajo. En un ordenador, <kbd>Esc</kbd> o <kbd>Espacio</kbd> apagan la emisión al instante.
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" role="tablist" aria-label="Secciones">
+    <button type="button" role="tab" id="tab-cues" data-tab="cues" aria-controls="page-cues"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg><span>Cues</span></button>
+    <button type="button" role="tab" id="tab-shape" data-tab="shape" aria-controls="page-shape"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M15 11l6 10H9z"/></svg><span>Forma</span></button>
+    <button type="button" role="tab" id="tab-color" data-tab="color" aria-controls="page-color"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5s6 6.4 6 10.7a6 6 0 0 1-12 0C6 9.9 12 3.5 12 3.5z"/></svg><span>Color</span></button>
+    <button type="button" role="tab" id="tab-fx" data-tab="fx" aria-controls="page-fx"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg><span>Efecto</span></button>
+    <button type="button" role="tab" id="tab-text" data-tab="text" aria-controls="page-text"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/></svg><span>Texto</span></button>
+    <button type="button" role="tab" id="tab-draw" data-tab="draw" aria-controls="page-draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13 7l4 4"/></svg><span>Dibujo</span></button>
+    <button type="button" role="tab" id="tab-settings" data-tab="settings" aria-controls="page-settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg><span>Ajustes</span></button>
+  </nav>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="assertive" hidden></div>
+<div id="modal-root"></div>
+</body>
+</html>
