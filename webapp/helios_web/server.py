@@ -76,7 +76,7 @@ class Client:
 
     def push(self, kind, text):
         if kind == "error":
-            self.errors.append(text)
+            self.errors = (self.errors + [text])[-MAX_PENDING_ERRORS:]
         else:
             setattr(self, kind, text)
         self.wake.set()
