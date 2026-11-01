@@ -23,13 +23,13 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
 
     const state = makeState();
     const sent = [];
-    let sock = null, connections = 0;
-    await page.routeWebSocket('**/ws', (ws) => {
+    let sock = null, connections = 0, blanked = false;
+    const wire = (p) => p.routeWebSocket('**/ws', (ws) => {
       sock = ws; connections++;
       const push = () => ws.send(JSON.stringify({ type: 'state', state }));
       push();
       let t = 0;
-      const timer = setInterval(() => ws.send(JSON.stringify(circleFrame(t++))), 50);
+      const timer = setInterval(() => ws.send(JSON.stringify(blanked ? { ...circleFrame(t++), strokes: [], blanked: true } : circleFrame(t++))), 50);
       timers.push(timer);
       ws.onClose(() => clearInterval(timer));
       ws.onMessage((raw) => {
@@ -40,8 +40,10 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
         else if (msg.type === 'scene') { Object.assign(state.scene, msg.scene); state.activeCue = null; push(); }
         else if (msg.type === 'settings') { Object.assign(state.settings, msg.settings); push(); }
         else if (msg.type === 'cue' && state.cues[msg.index]) { Object.assign(state.scene, state.cues[msg.index].scene); state.activeCue = msg.index; push(); }
+        else if (msg.type === 'tap') { state.bpm = 128; push(); }
       });
     });
+    await wire(page);
     const cdp = await context.newCDPSession(page);
     const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
     const center = async (sel) => { await page.locator(sel).scrollIntoViewIfNeeded(); await sleep(100); const b = await page.locator(sel).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2, b]; };
@@ -52,6 +54,16 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       assert(false, what);
     }
     const tab = async (name) => { await page.locator(`[data-tab="${name}"]`).tap(); await sleep(150); };
+    // box of a selector, or null when it is not rendered; "on screen" = fully inside the viewport
+    const box = (p, sel) => p.evaluate((s) => {
+      const el = document.querySelector(s);
+      if (!el || !el.getClientRects().length) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom, vw: innerWidth, vh: innerHeight };
+    }, sel);
+    const onScreen = (b) => !!b && b.w > 0 && b.h > 0 && b.x >= 0 && b.y >= 0 && b.r <= b.vw + 0.5 && b.b <= b.vh + 0.5;
+    // the arm / blackout control must be fully visible on every layout
+    const armOnScreen = async (p, what) => assert(onScreen(await box(p, '#arm')), `${what}: arm / blackout control fully on screen`);
 
     await page.goto(server.url);
     await page.waitForFunction(() => !document.body.classList.contains('offline'));
@@ -70,6 +82,29 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     assert(lit > 500, `preview has non-black pixels after frame (${lit})`);
     assert(Number(await page.locator('#fps').textContent()) > 0, 'fps shown from frame');
     await page.screenshot({ path: path.join(OUT, 'tab-cues.png') });
+    await armOnScreen(page, 'phone portrait');
+    assert(await page.locator('#livebar').isVisible() && await page.locator('#tab-cues').isVisible(), 'phone portrait: live bar shown, Cues is a tab');
+    await page.screenshot({ path: path.join(OUT, 'redesign-phone-portrait.png') });
+
+    // Live bar: a quick colour sends exactly a colour scene message and shows as selected once the state echoes it.
+    await page.locator('#quick-colors [data-color="#ff0000"]').tap();
+    await waitMsg((m) => m.type === 'scene' && JSON.stringify(m.scene) === '{"color":"#ff0000"}', 'live bar swatch sends {type:scene, scene:{color:"#ff0000"}}');
+    await page.waitForSelector('#quick-colors [data-color="#ff0000"].on[aria-checked="true"]');
+    assert(await page.locator('#quick-colors .on').count() === 1, 'live bar shows the current colour');
+    // TAP sends a tap; the BPM readouts follow the state.
+    await page.locator('#live-tap').tap();
+    await waitMsg((m) => m.type === 'tap', 'live bar TAP sends {type:tap}');
+    await page.waitForFunction(() => document.getElementById('live-bpm').textContent === '128' && document.getElementById('strip-bpm').textContent === '128');
+    assert(true, 'live bar and status strip show the BPM from the state');
+    // The effect chip names the current effect and opens the Efecto tab.
+    assert((await page.locator('#fx-name').textContent()) === 'Ninguno', 'effect chip shows the current effect name');
+    await page.locator('#fx-chip').tap();
+    await page.waitForSelector('#page-fx:not([hidden])');
+    assert((await page.locator('#tab-fx').getAttribute('aria-selected')) === 'true', 'effect chip opens the Efecto tab');
+    await page.locator('#effects button', { hasText: 'Pulso' }).tap();
+    await page.waitForFunction(() => document.getElementById('fx-name').textContent === 'Pulso');
+    assert(true, 'effect chip follows the effect from the state');
+    await tab('cues');
 
     await page.locator('.cue[data-index="0"]').tap();
     await waitMsg((m) => m.type === 'cue' && m.index === 0, 'tapping cue 0 sends {type:cue,index:0}');
@@ -85,9 +120,20 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     await page.waitForSelector('body.armed');
     assert((await page.locator('#arm-label').textContent()).startsWith('EN VIVO'), 'armed label from server state');
     await page.screenshot({ path: path.join(OUT, 'armed.png') });
+    await page.screenshot({ path: path.join(OUT, 'redesign-armed.png') });
+    assert((await page.locator('#arm-state').textContent()) === 'EN VIVO', 'status strip shows the armed state');
     await touch('touchStart', ax, ay); await touch('touchEnd');
     await waitMsg((m) => m.type === 'blackout', 'tap while armed sends blackout');
     await page.waitForSelector('body:not(.armed)');
+    assert((await page.locator('#arm-state').textContent()) === 'EN ESPERA', 'status strip shows standby after blackout');
+
+    // Beam safety blanked the frame: the badge shows over the preview.
+    blanked = true;
+    await page.waitForSelector('#blank-badge', { state: 'visible' });
+    await page.screenshot({ path: path.join(OUT, 'redesign-blanked.png') });
+    blanked = false;
+    await page.waitForSelector('#blank-badge', { state: 'hidden' });
+    assert(true, 'blanked frames show the beam-safety badge, which clears afterwards');
 
     // Forma: size slider drag.
     await tab('shape');
@@ -146,6 +192,57 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     await page.setViewportSize({ width: 844, height: 390 });
     await sleep(300);
     await page.screenshot({ path: path.join(OUT, 'landscape.png') });
+    await page.screenshot({ path: path.join(OUT, 'redesign-phone-landscape.png') });
+    await armOnScreen(page, 'phone landscape');
+    {
+      const [pv, live, grid] = [await box(page, '.preview-wrap'), await box(page, '#livebar'), await box(page, '#cue-grid')];
+      assert(onScreen(live) && pv.r <= grid.x && await page.locator('#tab-cues').isVisible(), 'phone landscape: preview, arm and live bar left of the panels; Cues still a tab');
+    }
+
+    // Tablet (820x1180, touch): two columns - preview, arm, live bar and cues left; tabbed controls right.
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await sleep(300);
+    {
+      const [pv, arm, live, grid, panel, tabs] = await Promise.all(['.preview-wrap', '#arm', '#livebar', '#cue-grid', '#panel', '.tabbar'].map((s) => box(page, s)));
+      assert(grid && panel && onScreen(grid) && panel.w > 0, 'tablet: cue grid and control panel both shown (no Cues tab switch needed)');
+      assert([pv, arm, live, grid].every((b) => b.r <= 410.5) && panel.x >= 409.5 && tabs.x >= 409.5, 'tablet: two columns (stage + cues left, tabs + panel right)');
+      assert(tabs.y < panel.y && !(await page.locator('#tab-cues').isVisible()), 'tablet: tabs on top of the panel, no Cues tab');
+      await armOnScreen(page, 'tablet');
+      await tab('color');
+      assert(await page.locator('#page-color').isVisible() && await page.locator('#cue-grid').isVisible(), 'tablet: switching tabs keeps the cue grid visible');
+    }
+    await page.screenshot({ path: path.join(OUT, 'redesign-tablet.png') });
+
+    // Desktop (1440x900, mouse): three columns, cue grid and control panel visible at the same time.
+    const desk = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const dp = await desk.newPage();
+    dp.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    dp.on('pageerror', (e) => errors.push(String(e)));
+    await wire(dp);
+    await dp.goto(server.url);
+    await dp.waitForFunction(() => !document.body.classList.contains('offline'));
+    await sleep(500);
+    {
+      const [pv, live, grid, panel, tabs] = await Promise.all(['.preview-wrap', '#livebar', '#cue-grid', '#panel', '.tabbar'].map((s) => box(dp, s)));
+      assert(onScreen(grid) && onScreen(tabs) && panel.w > 0 && await dp.locator('#page-shape').isVisible(), 'desktop: cue grid and control panel are both visible at the same time');
+      assert(pv.r <= grid.x && live.r <= grid.x && grid.r <= panel.x && grid.r <= tabs.x, 'desktop: three columns (preview | cues | controls)');
+      assert(!(await dp.locator('#tab-cues').isVisible()) && (await dp.locator('#tab-shape').getAttribute('aria-selected')) === 'true', 'desktop: no Cues tab; the first control tab is open');
+      assert(await dp.locator('.cue').count() === 16 && (await box(dp, '.cue[data-index="15"]')).b <= 900, 'desktop: all 16 cues on screen (4x4)');
+      await armOnScreen(dp, 'desktop');
+    }
+    await dp.locator('.cue[data-index="2"]').click();
+    await waitMsg((m) => m.type === 'cue' && m.index === 2, 'desktop: clicking a cue fires it');
+    await dp.locator('[data-tab="fx"]').click();
+    assert(await dp.locator('#page-fx').isVisible() && await dp.locator('#cue-grid').isVisible(), 'desktop: switching tabs keeps the cue grid visible');
+    await dp.locator('[data-tab="shape"]').click();
+    await sleep(300);
+    await dp.screenshot({ path: path.join(OUT, 'redesign-desktop.png') });
+    // keyboard safety still works with this layout: Space / Esc send blackout
+    const before = sent.filter((m) => m.type === 'blackout').length;
+    await dp.keyboard.press('Escape');
+    await dp.keyboard.press('Space');
+    await waitMsg(() => sent.filter((m) => m.type === 'blackout').length >= before + 2, 'desktop: Esc and Space send blackout');
+    await desk.close();
 
     assert(errors.length === 0, `no console errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
     console.log('UI MOCK OK');
