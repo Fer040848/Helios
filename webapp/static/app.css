@@ -319,9 +319,9 @@ body.offline .arm-state {
   left: calc((1 - var(--scan, 1)) * 50% + 6px);
   bottom: calc((1 - var(--scan, 1)) * 50% + 5px);
   max-width: calc((1 + var(--scan, 1)) * 50% - 8px);
-  overflow: hidden;
+  overflow: hidden; /* for the ellipsis; the line height leaves room for capital accents (Á) */
   color: var(--muted);
-  font: 600 10px/1 var(--font);
+  font: 600 10px/1.5 var(--font);
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
