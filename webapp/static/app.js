@@ -310,6 +310,7 @@ function applyState(s) {
   const dac = $("#dac"),
     dacs = S.dacs || [];
   dac.classList.toggle("sim", !!S.simulated);
+  dac.classList.toggle("real", !S.simulated && dacs.length > 0);
   dac.textContent = S.simulated
     ? "SIMULADOR"
     : dacs.length
@@ -321,6 +322,7 @@ function applyState(s) {
   applyBindings();
   renderDacs();
   renderScanArea();
+  renderLiveBar();
   $("#fx-speed").classList.toggle("dim", !!S.scene?.beatSync);
 }
 
@@ -341,6 +343,9 @@ function renderArm() {
   } else if (armPending) text = "ACTIVANDO…";
   label.textContent = text;
   armBtn.setAttribute("aria-label", aria);
+  const st = $("#arm-state");
+  st.textContent = S?.armed ? "EN VIVO" : armPending ? "ACTIVANDO…" : "EN ESPERA";
+  st.classList.toggle("live", online && !!S?.armed);
 }
 function blackout() {
   cancelHold();
@@ -514,7 +519,7 @@ function renderCues() {
     b.style.setProperty(
       "--c",
       c?.scene?.colorMode && c.scene.colorMode !== "solid"
-        ? "var(--acc2)"
+        ? "var(--text)"
         : c?.scene?.color || "",
     );
     const g = $(".glyph", b),
@@ -681,14 +686,16 @@ function showXY(x, y) {
 const colorInput = $("#color-input");
 {
   const th = throttle((c) => sendValue("scene.color", c), SEND_MS);
-  $("#swatches").addEventListener("click", (e) => {
+  const pick = (e) => {
     const b = e.target.closest("[data-color]");
     if (b) {
       touch("scene.color");
       showColor(b.dataset.color);
       sendValue("scene.color", b.dataset.color);
     }
-  });
+  };
+  $("#swatches").addEventListener("click", pick);
+  $("#quick-colors").addEventListener("click", pick); // live bar
   colorInput.addEventListener("input", () => {
     touch("scene.color");
     showColor(colorInput.value);
@@ -699,7 +706,7 @@ const colorInput = $("#color-input");
 }
 function showColor(c) {
   c = String(c).toLowerCase();
-  $$("#swatches [data-color]").forEach((b) => {
+  $$("#swatches [data-color], #quick-colors [data-color]").forEach((b) => {
     const on = b.dataset.color === c;
     b.classList.toggle("on", on);
     b.setAttribute("aria-checked", on);
@@ -711,21 +718,22 @@ function showColor(c) {
 
 // ---------- tempo ----------
 {
-  const tap = $("#tap");
-  const flash = () => {
-    tap.classList.add("flash");
-    setTimeout(() => tap.classList.remove("flash"), 90);
-  };
-  tap.addEventListener("pointerdown", () => {
-    send({ type: "tap" });
-    flash();
-  }); // touch-down for timing accuracy
-  tap.addEventListener("click", (e) => {
-    if (e.detail === 0) {
+  for (const tap of [$("#tap"), $("#live-tap")]) {
+    const flash = () => {
+      tap.classList.add("flash");
+      setTimeout(() => tap.classList.remove("flash"), 90);
+    };
+    tap.addEventListener("pointerdown", () => {
       send({ type: "tap" });
       flash();
-    }
-  }); // keyboard
+    }); // touch-down for timing accuracy
+    tap.addEventListener("click", (e) => {
+      if (e.detail === 0) {
+        send({ type: "tap" });
+        flash();
+      }
+    }); // keyboard
+  }
   const nudge = (d) => {
     touch("bpm");
     sendValue(
@@ -739,6 +747,24 @@ function showColor(c) {
     $("#bpm-value").textContent = Math.round(v * 10) / 10;
   });
 }
+
+// ---------- live bar (BPM readouts, effect chip) ----------
+const setText = (el, t) => {
+  if (el.textContent !== t) el.textContent = t;
+};
+function renderLiveBar() {
+  // straight from the state, not a binding: the readouts follow the real tempo even while the BPM slider is held
+  const bpm = String(Math.round((S?.bpm ?? 120) * 10) / 10);
+  setText($("#strip-bpm"), bpm);
+  setText($("#live-bpm"), bpm);
+  const fx = S?.scene?.effect,
+    name = S?.effects?.find((e) => e.id === fx)?.name || fx || "—";
+  const chip = $("#fx-chip");
+  setText($("#fx-name"), name);
+  chip.classList.toggle("on", !!fx && fx !== "none");
+  chip.setAttribute("aria-label", `Efecto: ${name}. Abrir el panel de efectos`);
+}
+$("#fx-chip").addEventListener("click", () => showTab("fx"));
 
 // ---------- text ----------
 {
@@ -875,25 +901,51 @@ $("#rescan").addEventListener("click", () => {
 });
 
 // ---------- tabs ----------
-function showTab(name) {
+// Phones: Cues is one of the tabs and shares the panel area. Tablet and desktop (the same media query as app.css):
+// the cue grid is always on screen and the tabs switch only the control panel.
+const wideQuery = matchMedia("(min-width: 600px) and (min-height: 520px)");
+const cuesPane = $("#page-cues"),
+  panel = $("#panel");
+let tabPref = "cues", // the user's last choice
+  panelTab = "shape", // the last control tab (what wide layouts show)
+  shownTab = "";
+function renderTabs() {
+  const wide = wideQuery.matches,
+    active = wide && tabPref === "cues" ? panelTab : tabPref;
   $$(".tabbar [role=tab]").forEach((t) =>
-    t.setAttribute("aria-selected", t.dataset.tab === name),
+    t.setAttribute("aria-selected", t.dataset.tab === active),
   );
-  $$(".page").forEach((p) => {
-    p.hidden = p.dataset.page !== name;
+  $$(".page", panel).forEach((p) => {
+    p.hidden = p.dataset.page !== active;
   });
-  $("#panel").scrollTop = 0;
+  cuesPane.hidden = !wide && active !== "cues";
+  cuesPane.setAttribute("role", wide ? "region" : "tabpanel");
+  cuesPane.setAttribute("aria-label", "Cues");
+  panel.hidden = !wide && active === "cues";
+  $("#fx-chip").classList.toggle("open", active === "fx" && !panel.hidden);
+  if (active !== shownTab) {
+    shownTab = active;
+    panel.scrollTop = 0;
+    if (active === "draw") invalidateDraw();
+  }
+}
+function showTab(name) {
+  tabPref = name;
+  if (name !== "cues") panelTab = name;
+  renderTabs();
   try {
     localStorage.setItem("helios.tab", name);
   } catch {
     /* storage unavailable */
   }
-  if (name === "draw") invalidateDraw();
 }
 $(".tabbar").addEventListener("click", (e) => {
   const t = e.target.closest("[data-tab]");
   if (t) showTab(t.dataset.tab);
 });
+// Safari < 14 only has addListener
+if (wideQuery.addEventListener) wideQuery.addEventListener("change", renderTabs);
+else wideQuery.addListener?.(renderTabs);
 
 $$(".slider[data-key]").forEach(setupSlider);
 $$(".seg[data-key], .chips[data-key]").forEach(setupChoice);
@@ -904,6 +956,7 @@ try {
 } catch {
   /* storage unavailable */
 }
-showTab($(`[data-tab="${initialTab}"]`) ? initialTab : "cues");
+if (!$(`[data-tab="${initialTab}"]`)) initialTab = "cues";
+showTab(initialTab);
 renderArm();
 renderCues();

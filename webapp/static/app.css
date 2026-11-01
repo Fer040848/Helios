@@ -37,20 +37,30 @@
   --r-lg: 8px;
   --hit: 44px;
   --strip-h: 40px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   /* safe areas */
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
-  /* phone portrait: the preview gets what the fixed rows (strip, arm, live bar, tabs) and a usable panel leave */
-  --pv: min(calc(100vw - 24px - var(--sal) - var(--sar)), max(30vh, calc(100vh - 520px - var(--sat) - var(--sab))));
+  /* the visible height (dynamic viewport where supported: mobile browser bars) */
+  --vh100: 100vh;
+  /* phone portrait: the fixed rows (strip, stage chrome: arm + live bar, tab bar) take ~276 px; the preview and the
+     panel share the rest, the panel keeping at least ~280 px so the drawing pad and sliders stay usable */
+  --pv: min(
+    calc(100vw - 24px - var(--sal) - var(--sar)),
+    max(calc(var(--vh100) * 0.3), calc(var(--vh100) - 556px - var(--sat) - var(--sab)))
+  );
+  --panel-h: calc(var(--vh100) - var(--pv) - 276px - var(--sat) - var(--sab));
   color-scheme: dark;
 }
 @supports (height: 100dvh) {
   :root {
-    --pv: min(calc(100vw - 24px - var(--sal) - var(--sar)), max(30dvh, calc(100dvh - 520px - var(--sat) - var(--sab))));
+    --vh100: 100dvh;
   }
 }
 * {
@@ -422,6 +432,15 @@ body.offline .arm-icon svg {
   color: var(--faint);
 }
 
+.kbd-hint {
+  display: none;
+  order: 3; /* under the live bar */
+  margin: var(--s1) 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 /* live bar: quick colours / TAP + BPM / effect chip */
 .livebar {
   flex: none;
@@ -738,14 +757,14 @@ h2 {
 .cue.empty {
   border-style: dashed;
   background: transparent;
-  color: var(--faint);
+  color: #6c7380;
 }
 .cue.empty .art {
   visibility: hidden;
   border-bottom-color: transparent;
 }
 .cue.empty .num {
-  color: var(--faint);
+  color: #6c7380;
 }
 .cue.empty .name {
   font-weight: 400;
@@ -1009,12 +1028,24 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--border) var(--a), var(--t) var(--a), var(--t) var(--b), var(--border) var(--b));
+  background: linear-gradient(
+    90deg,
+    var(--border) var(--a),
+    var(--t) var(--a),
+    var(--t) var(--b),
+    var(--border) var(--b)
+  );
 }
 input[type="range"]::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--border) var(--a), var(--t) var(--a), var(--t) var(--b), var(--border) var(--b));
+  background: linear-gradient(
+    90deg,
+    var(--border) var(--a),
+    var(--t) var(--a),
+    var(--t) var(--b),
+    var(--border) var(--b)
+  );
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -1036,10 +1067,14 @@ input[type="range"]:focus-visible {
   outline: none;
 }
 input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 0 1px var(--accent);
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    0 0 0 1px var(--accent);
 }
 input[type="range"]:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 0 1px var(--accent);
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    0 0 0 1px var(--accent);
 }
 @media (pointer: coarse) {
   input[type="range"] {
@@ -1311,7 +1346,8 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 }
 .draw-canvas {
   display: block;
-  width: min(100%, 340px);
+  /* fits the visible panel height (with the undo/clear row just below), so a stroke never runs under the tab bar */
+  width: min(100%, 340px, max(180px, calc(var(--panel-h) - 64px)));
   aspect-ratio: 1;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -1377,6 +1413,7 @@ kbd {
   z-index: 30;
   left: 50%;
   bottom: calc(var(--sab) + 70px);
+  width: max-content;
   max-width: calc(100vw - 32px);
   transform: translateX(-50%);
   padding: 10px var(--s4);
@@ -1387,6 +1424,7 @@ kbd {
   font-size: 13px;
   font-weight: 600;
   text-align: center;
+  pointer-events: none; /* informational only: never blocks a control under it (above all the arm / blackout) */
 }
 .toast.error {
   border-color: var(--live);
@@ -1448,19 +1486,51 @@ kbd {
 }
 
 /* ---------- narrow phones: keep the strip on one line ---------- */
-@media (max-width: 400px) {
-  .brand-name {
-    display: none;
-  }
+@media (max-width: 420px) {
   .strip {
     gap: 6px;
     padding-left: 10px;
     padding-right: 10px;
   }
+  .brand {
+    gap: 5px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+  .strip-fill {
+    display: none;
+  }
+  .stat-perf {
+    margin-left: auto;
+  }
+  .badge {
+    padding: 2px 5px;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+  }
+  .arm-state {
+    padding: 3px 5px;
+    letter-spacing: 0.04em;
+  }
+  .stat-perf {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-size: 10px;
+  }
+  .stat-perf .sep {
+    display: none;
+  }
 }
-@media (max-width: 340px) {
+@media (max-width: 379px) {
+  .brand-name {
+    display: none; /* the mark stays, labelled "Helios Web Control" */
+  }
+}
+@media (max-width: 330px) {
   .stat-bpm {
-    display: none; /* the live bar shows it */
+    display: none; /* the live bar shows the tempo */
   }
 }
 
@@ -1468,12 +1538,14 @@ kbd {
 @media (orientation: landscape) and (max-height: 519px) and (min-width: 520px) {
   :root {
     --side: 172px;
-    --pv: max(140px, min(calc(100vh - 56px - var(--sat) - var(--sab)), calc(100vw - 360px - var(--side) - 32px - var(--sal) - var(--sar))));
-  }
-  @supports (height: 100dvh) {
-    :root {
-      --pv: max(140px, min(calc(100dvh - 56px - var(--sat) - var(--sab)), calc(100vw - 360px - var(--side) - 32px - var(--sal) - var(--sar))));
-    }
+    --pv: max(
+      140px,
+      min(
+        calc(var(--vh100) - 56px - var(--sat) - var(--sab)),
+        calc(100vw - 360px - var(--side) - 32px - var(--sal) - var(--sar))
+      )
+    );
+    --panel-h: calc(var(--vh100) - var(--strip-h) - 47px - var(--sat) - var(--sab));
   }
   #app {
     grid-template-columns: auto minmax(0, 1fr);
@@ -1486,6 +1558,7 @@ kbd {
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: "pv arm" "pv live";
     align-content: start;
+    align-items: start;
     gap: var(--s2);
     padding: var(--s2) var(--s3) calc(var(--s2) + var(--sab));
     border-right: 1px solid var(--border);
@@ -1530,7 +1603,10 @@ kbd {
     height: 19px;
   }
   .toast {
+    /* over the panel column, clear of the stage */
+    left: calc((var(--pv) + var(--side) + 32px + var(--sal) + 100vw - var(--sar)) / 2);
     bottom: calc(var(--sab) + 58px);
+    max-width: calc(100vw - var(--pv) - var(--side) - 64px - var(--sal) - var(--sar));
   }
 }
 
@@ -1538,12 +1614,8 @@ kbd {
 @media (min-width: 600px) and (min-height: 520px) {
   :root {
     --colL: calc(50vw - (var(--sal) + var(--sar)) / 2);
-    --pv: min(calc(var(--colL) - 32px), max(220px, calc(100vh - 560px)));
-  }
-  @supports (height: 100dvh) {
-    :root {
-      --pv: min(calc(var(--colL) - 32px), max(220px, calc(100dvh - 560px)));
-    }
+    --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 560px)));
+    --panel-h: calc(var(--vh100) - var(--strip-h) - 57px - var(--sat) - var(--sab));
   }
   #app {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1554,6 +1626,12 @@ kbd {
     gap: var(--s3);
     padding-left: var(--s4);
     padding-right: var(--s4);
+  }
+  .stat {
+    font-size: 12px;
+  }
+  .arm-state {
+    font-size: 11px;
   }
   .stage {
     padding: var(--s4) var(--s4) var(--s3);
@@ -1613,20 +1691,25 @@ kbd {
 @media (orientation: landscape) and (min-width: 600px) and (max-width: 1099px) and (min-height: 520px) {
   .cue-grid {
     grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .cue .num {
+    display: none; /* narrow tiles: the name gets the room (the slot number is in its aria-label) */
+  }
+  .cue .meta {
+    padding: 3px 5px 4px;
+  }
+  .cue .name {
+    font-size: 10.5px;
   }
 }
 
 /* ---------- desktop: preview | cues | controls, all visible at once ---------- */
 @media (min-width: 1100px) and (min-height: 520px) {
   :root {
-    --colL: clamp(340px, 30vw, 460px);
+    --colL: clamp(340px, 32vw, 520px);
     --colR: clamp(360px, 30vw, 460px);
-    --pv: min(calc(var(--colL) - 32px), max(220px, calc(100vh - 264px)));
-  }
-  @supports (height: 100dvh) {
-    :root {
-      --pv: min(calc(var(--colL) - 32px), max(220px, calc(100dvh - 264px)));
-    }
+    --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 264px)));
   }
   #app {
     grid-template-columns: var(--colL) minmax(0, 1fr) var(--colR);
@@ -1655,6 +1738,9 @@ kbd {
   .cue-grid {
     gap: var(--s3);
   }
+  .cue .art {
+    aspect-ratio: 1; /* larger thumbnails: the centre column has the height for it */
+  }
   .cue .meta {
     padding: 6px 8px 7px;
   }
@@ -1667,5 +1753,10 @@ kbd {
   .cue .glyph svg {
     width: 32px;
     height: 32px;
+  }
+}
+@media (min-width: 1100px) and (min-height: 520px) and (hover: hover) and (pointer: fine) {
+  .kbd-hint {
+    display: block;
   }
 }
