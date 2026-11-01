@@ -57,9 +57,14 @@
   --chrome-v: 282px;
   --pv: min(
     calc(100vw - 24px - var(--sal) - var(--sar)),
-    max(200px, calc(var(--vh100) - var(--chrome-v) - 280px - var(--sat) - var(--sab)))
+    max(
+      200px,
+      calc(var(--vh100) - var(--chrome-v) - 280px - var(--sat) - var(--sab))
+    )
   );
-  --panel-h: calc(var(--vh100) - var(--pv) - var(--chrome-v) - var(--sat) - var(--sab));
+  --panel-h: calc(
+    var(--vh100) - var(--pv) - var(--chrome-v) - var(--sat) - var(--sab)
+  );
   color-scheme: dark;
 }
 @supports (height: 100dvh) {
@@ -210,7 +215,9 @@ body:not(.offline) #conn-label {
   left: 0;
   right: 0;
   top: calc(50% - 0.7em - 3px);
-  height: calc(1.4em + 6px); /* one line of text + 2 px padding + 1 px border, each side */
+  height: calc(
+    1.4em + 6px
+  ); /* one line of text + 2 px padding + 1 px border, each side */
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--panel-2);
@@ -698,7 +705,9 @@ body.offline .arm-icon svg {
   }
   body.armed .arm:hover {
     border-color: var(--live);
-    background: var(--live-fill-hover); /* darker, never lighter: the label keeps its contrast */
+    background: var(
+      --live-fill-hover
+    ); /* darker, never lighter: the label keeps its contrast */
   }
 }
 
@@ -1625,7 +1634,8 @@ kbd {
    gaps) + tab bar 55 = 230 px. The panel keeps 280 px on screens from ~650 px tall; below that the preview stops at
    a quarter of the height (130 px at least) and the panel gets the rest (about 200 px on a 360x560 screen).
    The query is the phone-portrait layout region (neither the phone-landscape nor the tablet query) up to 760 px. */
-@media (max-width: 519px) and (max-height: 760px), (max-width: 599px) and (min-height: 520px) and (max-height: 760px) {
+@media (max-width: 519px) and (max-height: 760px),
+  (max-width: 599px) and (min-height: 520px) and (max-height: 760px) {
   :root {
     --chrome-v: 230px;
     --pv: min(
@@ -1661,7 +1671,11 @@ kbd {
     flex: 1 1 0;
   }
   .draw-canvas {
-    width: min(100%, 340px, calc(var(--panel-h) - 80px)); /* no 150 px floor: the panel is under 230 px here */
+    width: min(
+      100%,
+      340px,
+      calc(var(--panel-h) - 80px)
+    ); /* no 150 px floor: the panel is under 230 px here */
   }
 }
 
@@ -1676,7 +1690,9 @@ kbd {
         calc(100vw - 340px - var(--side) - 32px - var(--sal) - var(--sar))
       )
     );
-    --panel-h: calc(var(--vh100) - var(--strip-h) - 47px - var(--sat) - var(--sab));
+    --panel-h: calc(
+      var(--vh100) - var(--strip-h) - 47px - var(--sat) - var(--sab)
+    );
   }
   #app {
     grid-template-columns: auto minmax(0, 1fr);
@@ -1735,9 +1751,13 @@ kbd {
   }
   .toast {
     /* over the panel column, clear of the stage */
-    left: calc((var(--pv) + var(--side) + 32px + var(--sal) + 100vw - var(--sar)) / 2);
+    left: calc(
+      (var(--pv) + var(--side) + 32px + var(--sal) + 100vw - var(--sar)) / 2
+    );
     bottom: calc(var(--sab) + 58px);
-    max-width: calc(100vw - var(--pv) - var(--side) - 64px - var(--sal) - var(--sar));
+    max-width: calc(
+      100vw - var(--pv) - var(--side) - 64px - var(--sal) - var(--sar)
+    );
   }
 }
 /* small phones in landscape (iPhone SE / 8 at 667x375): the preview is width-limited, so TAP and the effect chip go
@@ -1766,7 +1786,9 @@ kbd {
   :root {
     --colL: calc(50vw - (var(--sal) + var(--sar)) / 2);
     --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 560px)));
-    --panel-h: calc(var(--vh100) - var(--strip-h) - 57px - var(--sat) - var(--sab));
+    --panel-h: calc(
+      var(--vh100) - var(--strip-h) - 57px - var(--sat) - var(--sab)
+    );
   }
   #app {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
