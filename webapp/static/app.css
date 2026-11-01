@@ -1,0 +1,1941 @@
+/* Helios Web Control - "consola profesional" theme.
+   Flat chrome (1px borders, 4-8 px radii); glow only inside the laser preview and on the armed state.
+   Layouts: phone portrait (default), phone landscape, tablet / small laptop (two columns), desktop (three). */
+:root {
+  /* palette */
+  --bg: #0d0f12;
+  --panel: #15181d;
+  --panel-2: #1c2026;
+  --border: #2a2f37;
+  --border-strong: #3b414b;
+  --hover: #22272e;
+  --press: #282e36;
+  --inset: #090b0d; /* wells: slider tracks, readouts, inputs */
+  --text: #e6e8eb;
+  --muted: #8b93a1;
+  --faint: #5d6471;
+  --accent: #4cc3ff;
+  --accent-ink: #04131b;
+  --accent-soft: rgba(76, 195, 255, 0.14);
+  --accent-line: rgba(76, 195, 255, 0.55);
+  --live: #ff3b30;
+  --live-soft: rgba(255, 59, 48, 0.14);
+  --live-line: rgba(255, 59, 48, 0.5);
+  --live-fill: #d92d20; /* fill under white labels (4.8:1); --live stays for borders, glow and dots */
+  --live-fill-hover: #c0271d; /* 5.9:1 */
+  --ok: #34c759;
+  --warn: #ffb020;
+  --warn-soft: rgba(255, 176, 32, 0.1);
+  --warn-line: rgba(255, 176, 32, 0.45);
+  /* spacing scale */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  /* shape */
+  --r-sm: 4px;
+  --r: 6px;
+  --r-lg: 8px;
+  --hit: 44px;
+  --strip-h: 40px;
+  --font:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* safe areas */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  /* the visible height (dynamic viewport where supported: mobile browser bars) */
+  --vh100: 100vh;
+  /* Phone portrait, tall screens (> 760 px). Fixed rows (--chrome-v): strip 41 + stage 186 (padding 16, arm 52,
+     colours 50, TAP / effect row 44, three 8 px gaps) + tab bar 55 = 282 px. The panel keeps 280 px and the preview
+     takes the rest (at least 200 px). Shorter screens use the layout of the max-height: 760px block below. */
+  --chrome-v: 282px;
+  --pv: min(
+    calc(100vw - 24px - var(--sal) - var(--sar)),
+    max(
+      200px,
+      calc(var(--vh100) - var(--chrome-v) - 280px - var(--sat) - var(--sab))
+    )
+  );
+  --panel-h: calc(
+    var(--vh100) - var(--pv) - var(--chrome-v) - var(--sat) - var(--sab)
+  );
+  color-scheme: dark;
+}
+@supports (height: 100dvh) {
+  :root {
+    --vh100: 100dvh;
+  }
+}
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  font: 14px/1.4 var(--font);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[hidden] {
+  display: none !important;
+}
+/* visible keyboard focus everywhere; no ring for pointer focus */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ---------- app grid: phone portrait ---------- */
+#app {
+  height: 100%;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "strip" "stage" "panel" "tabs";
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+.ctrl {
+  display: contents; /* phones: the tab bar and the panel are placed in the app grid directly */
+}
+
+/* ---------- status strip ---------- */
+.strip {
+  grid-area: strip;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  min-height: calc(var(--strip-h) + var(--sat));
+  padding: var(--sat) var(--s3) 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+}
+.brand svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  stroke-width: 2;
+}
+.conn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  flex: none;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+}
+body:not(.offline) .dot {
+  background: var(--ok);
+}
+body:not(.offline) #conn-label {
+  display: none;
+}
+.badge {
+  /* A button (it opens Ajustes): a 44 px tall touch target; ::before draws the small chip in its middle, and the
+     negative margins keep the strip at its height (the target reaches 2 px past it, above the stage's padding). */
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 34vw;
+  min-height: var(--hit);
+  margin: -12px 0;
+  padding: 0 7px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badge::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  top: calc(50% - 0.7em - 3px);
+  height: calc(
+    1.4em + 6px
+  ); /* one line of text + 2 px padding + 1 px border, each side */
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+}
+.badge:focus-visible {
+  outline: none;
+}
+.badge:focus-visible::before {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px; /* inside the chip: the button's overflow (for the ellipsis) would clip the sides */
+}
+.badge:hover::before {
+  border-color: var(--accent);
+}
+.badge.sim {
+  color: var(--warn);
+}
+.badge.sim::before {
+  border-color: var(--warn-line);
+}
+.badge.real {
+  color: var(--ok);
+}
+.badge.real::before {
+  border-color: rgba(52, 199, 89, 0.45);
+}
+.strip-fill {
+  flex: 1;
+  min-width: 0;
+}
+.stat {
+  flex: none;
+  color: var(--muted);
+  font: 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.stat b {
+  color: var(--text);
+  font-weight: 500;
+}
+.sep {
+  margin: 0 5px;
+  color: var(--faint);
+}
+.arm-state {
+  flex: none;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.arm-state.live {
+  border-color: var(--live);
+  background: var(--live-fill);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+}
+body.offline .arm-state {
+  display: none; /* the connection label says it */
+}
+
+/* ---------- stage: preview, arm, live bar ---------- */
+.stage {
+  grid-area: stage;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s2) var(--s3);
+}
+.banner {
+  position: absolute;
+  z-index: 5;
+  top: var(--s2);
+  left: var(--s3);
+  right: var(--s3);
+  padding: 10px var(--s3);
+  border: 1px solid var(--live);
+  border-radius: var(--r-lg);
+  background: #2a1210;
+  color: #ffd6d3;
+  font-weight: 600;
+  text-align: center;
+}
+.preview-wrap {
+  position: relative;
+  flex: none;
+  width: var(--pv);
+  height: var(--pv);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: #000;
+  overflow: hidden;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+#preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.live-tag {
+  position: absolute;
+  top: var(--s2);
+  left: var(--s2);
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 1px solid var(--live);
+  border-radius: var(--r-sm);
+  background: var(--live-fill);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.6);
+}
+/* the label stays steady (readable); only its dot blinks, with opacity, which the compositor animates */
+.live-tag::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: dot 1.2s infinite;
+}
+/* Scan-area label: bottom-left corner inside the dashed scan rectangle drawn on the canvas (--scan = scanSize).
+   The max-width keeps it inside the preview; app.js picks the longest form that fits it (the ellipsis is a fallback). */
+.scan-label {
+  position: absolute;
+  left: calc((1 - var(--scan, 1)) * 50% + 6px);
+  bottom: calc((1 - var(--scan, 1)) * 50% + 5px);
+  max-width: calc((1 + var(--scan, 1)) * 50% - 8px);
+  overflow: hidden; /* for the ellipsis; the line height leaves room for capital accents (Á) */
+  color: var(--muted);
+  font: 600 10px/1.5 var(--font);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.scan-label.outside {
+  left: 0;
+  right: 0;
+  bottom: auto;
+  top: calc((1 + var(--scan, 1)) * 50% + 5px);
+  max-width: none;
+  text-align: center;
+}
+/* Beam safety blanked the current frame: nothing is emitted even when armed. */
+.blank-badge {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r);
+  background: rgba(13, 15, 18, 0.88);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-align: center;
+  pointer-events: none;
+}
+.preview-wrap.compact .blank-badge {
+  padding: 5px 8px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+body.armed .preview-wrap {
+  border-color: var(--live);
+  box-shadow:
+    0 0 0 1px var(--live),
+    0 0 22px rgba(255, 59, 48, 0.45);
+}
+body.armed .live-tag {
+  display: flex;
+}
+@keyframes blink {
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes dot {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* arm / blackout: the one control that is always on screen. Phones: the arm, the quick colours and the live bar
+   span the stage (the width of the panel content below); the square preview is centred above them. */
+.arm,
+.quick-colors,
+.livebar {
+  width: 100%;
+  max-width: 100%;
+}
+.arm {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px var(--s4);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-align: center;
+  touch-action: none;
+  --p: 0;
+}
+.arm-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--p));
+  background: rgba(255, 59, 48, 0.32);
+}
+.arm-icon,
+.arm-label {
+  position: relative;
+}
+.arm-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  color: var(--live);
+  stroke-width: 2.4;
+}
+.arm.pending {
+  border-color: var(--live);
+}
+/* Armed: a deep red fill under the white label (contrast) and a steady glow. No animation here: a box-shadow
+   animation repaints on the main thread every frame, which the WebUSB output loop shares. */
+body.armed .arm {
+  border-color: var(--live);
+  background: var(--live-fill);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(255, 59, 48, 0.6);
+}
+body.armed .arm-icon svg {
+  color: #fff;
+}
+body.armed .arm-fill {
+  display: none;
+}
+body.offline .arm {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  box-shadow: none;
+  pointer-events: none;
+}
+body.offline .arm-icon svg {
+  color: var(--faint);
+}
+
+.kbd-hint {
+  display: none;
+  order: 3; /* under the live bar */
+  margin: var(--s1) 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* live bar: quick colours (one row of 8; the buttons touch, the swatch inset is the visual gap, so each target is
+   as wide as the row allows), then TAP + BPM and the effect chip */
+.livebar {
+  flex: none;
+  display: flex;
+  gap: var(--s2);
+}
+.quick-colors {
+  flex: none;
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+.quick-colors button,
+.swatches button {
+  position: relative;
+  min-width: 0;
+  padding: 5px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+}
+.quick-colors button {
+  flex: 1 1 0;
+  height: var(--hit);
+}
+.quick-colors button::before,
+.swatches button::before {
+  content: "";
+  display: block;
+  height: 100%;
+  border-radius: var(--r-sm);
+  background: var(--sw);
+}
+.quick-colors button.on,
+.swatches button.on {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.live-tap,
+.fx-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  min-height: var(--hit);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+}
+.live-tap {
+  flex: 1 1 0;
+  justify-content: space-between;
+  padding: 0 var(--s3);
+  touch-action: manipulation;
+}
+.lt-key {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+.lt-read {
+  color: var(--muted);
+  font: 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.lt-read b {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.fx-chip {
+  flex: 1.35 1 0;
+  padding: 0 var(--s2) 0 var(--s3);
+  text-align: left;
+}
+.fx-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.fx-key {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.fx-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-chip.on .fx-name {
+  color: var(--accent);
+}
+.fx-chip svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+.fx-chip.open {
+  border-color: var(--accent-line);
+}
+
+/* ---------- shared controls ---------- */
+.btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: var(--hit);
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.btn svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.btn.compact {
+  flex: none;
+  padding: 0 var(--s3);
+}
+.btn.danger {
+  border-color: var(--live-line);
+  color: #ff7a72;
+}
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn.wide {
+  width: 100%;
+  margin-top: var(--s2);
+}
+.btn:disabled {
+  opacity: 0.42;
+}
+#save-mode[aria-pressed="true"] {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+/* pressed feedback (touch and mouse) */
+.btn:active:not(:disabled),
+.live-tap:active,
+.fx-chip:active,
+.chips button:active,
+.seg button:active,
+.round:active,
+.tap:active {
+  background: var(--press);
+}
+.btn.primary:active:not(:disabled) {
+  background: #3aa9e0;
+}
+@media (hover: hover) {
+  .btn:hover:not(:disabled),
+  .live-tap:hover,
+  .fx-chip:hover,
+  .chips button:hover,
+  .round:hover,
+  .custom-color:hover,
+  .arm:hover {
+    border-color: var(--border-strong);
+    background: var(--hover);
+  }
+  .btn.primary:hover:not(:disabled) {
+    border-color: #6fd0ff;
+    background: #6fd0ff;
+  }
+  .seg button:not(.on):hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .tabbar button:not([aria-selected="true"]):hover {
+    color: var(--text);
+  }
+  .quick-colors button:not(.on):hover,
+  .swatches button:not(.on):hover {
+    box-shadow: inset 0 0 0 2px var(--border-strong);
+  }
+  body.armed .arm:hover {
+    border-color: var(--live);
+    background: var(
+      --live-fill-hover
+    ); /* darker, never lighter: the label keeps its contrast */
+  }
+}
+
+/* ---------- cues ---------- */
+.cues-pane {
+  grid-area: panel;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--s3) var(--s3) var(--s4);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+.pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+}
+h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.hint {
+  margin: 0 0 var(--s3);
+  color: var(--muted);
+  font-size: 13px;
+}
+.hint.small {
+  margin: var(--s3) 0 0;
+  font-size: 12px;
+  text-align: center;
+}
+#save-hint {
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--warn-line);
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  color: #f3dcae;
+}
+/* tile = live thumbnail (thumbs.js; the pattern glyph until it loads) + number and name */
+.cue-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s2);
+}
+.cue {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 64px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--panel-2);
+  text-align: left;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.cue .art {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-bottom: 1px solid var(--border);
+  background: #000;
+}
+.cue .glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cue .glyph svg {
+  width: 24px;
+  height: 24px;
+  color: var(--c, var(--accent));
+}
+.cue .thumb {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cue .meta {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 6px 5px;
+}
+.cue .num {
+  flex: none;
+  color: var(--muted);
+  font: 10px/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.cue .name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cue.empty {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+.cue.empty .art {
+  visibility: hidden;
+  border-bottom-color: transparent;
+}
+.cue.empty .num {
+  color: var(--muted);
+}
+.cue.empty .name {
+  font-weight: 400;
+}
+/* selection / focus ring drawn over the thumbnail, so it does not resize the canvas (only on the tiles that show
+   one: an overlay on every tile would add a layer above each thumbnail canvas) */
+.cue.active::after,
+.cue:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.cue.active {
+  border-color: var(--accent);
+}
+.cue.active::after {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.cue.active .meta {
+  background: var(--accent-soft);
+}
+.cue.active .name {
+  color: var(--accent);
+}
+.cue:focus-visible {
+  outline: none;
+}
+.cue:focus-visible::after {
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    inset 0 0 0 3px #000;
+}
+.cue:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) {
+  .cue:not(.active):hover {
+    border-color: var(--border-strong);
+  }
+}
+.saving .cue {
+  border-style: dashed;
+  border-color: var(--warn);
+  animation: blink 1.3s infinite;
+}
+
+/* ---------- tab bar ---------- */
+.tabbar {
+  grid-area: tabs;
+  display: flex;
+  padding-bottom: var(--sab);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+.tabbar button {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.tabbar button:focus-visible {
+  outline-offset: -3px;
+}
+.tabbar svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 1.7;
+}
+.tabbar button[aria-selected="true"] {
+  color: var(--accent);
+}
+.tabbar button[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 22%;
+  right: 22%;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--accent);
+}
+
+/* ---------- control panel ---------- */
+.panel {
+  grid-area: panel;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--s3) var(--s5);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+body.offline .panel,
+body.offline .cues-pane,
+body.offline .quick-colors,
+body.offline .livebar {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+}
+/* section labels */
+h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: var(--s5) 0 var(--s2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.page > h3:first-child {
+  margin-top: var(--s4);
+}
+.h-note {
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* chips (patterns, effects) */
+.chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.chips button {
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--panel-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+.glyph-chips {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+.glyph-chips button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 60px;
+  font-size: 11.5px;
+}
+.glyph-chips svg {
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+}
+.chips button.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.glyph-chips button.on svg {
+  color: var(--accent);
+}
+
+/* segmented controls (enums) */
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--inset);
+}
+.seg button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 0 var(--s1);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.seg button.on {
+  background: var(--panel-2);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.seg.wrap {
+  flex-wrap: wrap;
+}
+.seg.wrap button {
+  flex: 1 1 40%;
+}
+
+/* sliders: label + readout, then the track */
+.slider {
+  display: block;
+  margin: var(--s3) 0 0;
+}
+.sl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: 22px;
+  font-size: 13px;
+}
+.sl-head small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.sl-head output {
+  flex: none;
+  min-width: 58px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--inset);
+  color: var(--text);
+  font: 12px/1.3 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.slider.safety output {
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 34px;
+  margin: 0;
+  background: transparent;
+  --a: 0%;
+  --b: 0%;
+  --t: var(--accent);
+}
+.slider.safety input[type="range"] {
+  --t: var(--warn);
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--border) var(--a),
+    var(--t) var(--a),
+    var(--t) var(--b),
+    var(--border) var(--b)
+  );
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--border) var(--a),
+    var(--t) var(--a),
+    var(--t) var(--b),
+    var(--border) var(--b)
+  );
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid var(--t);
+  border-radius: 50%;
+  background: var(--text);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--t);
+  border-radius: 50%;
+  background: var(--text);
+}
+input[type="range"]:focus-visible {
+  outline: none;
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    0 0 0 1px var(--accent);
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    0 0 0 1px var(--accent);
+}
+@media (pointer: coarse) {
+  input[type="range"] {
+    height: var(--hit);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -10px;
+  }
+}
+
+/* switches */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: 48px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.switch-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.switch-row input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--inset);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s;
+}
+.switch-row input:checked + .switch {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.switch-row input:checked + .switch::after {
+  transform: translateX(18px);
+  background: var(--accent-ink);
+}
+.switch-row input:focus-visible + .switch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* XY pad */
+.xy-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+}
+.xy-pad {
+  position: relative;
+  width: min(100%, 240px);
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  touch-action: none;
+  background-color: #000;
+  background-image:
+    linear-gradient(90deg, rgba(139, 147, 161, 0.12) 1px, transparent 1px),
+    linear-gradient(rgba(139, 147, 161, 0.12) 1px, transparent 1px);
+  background-size: 12.5% 12.5%;
+}
+.xy-h,
+.xy-v {
+  position: absolute;
+  background: rgba(139, 147, 161, 0.4);
+}
+.xy-h {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+.xy-v {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+.xy-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+.xy-read {
+  color: var(--muted);
+  font: 12px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* colour */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.swatches button {
+  height: 48px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.swatches button.on {
+  border-color: var(--accent);
+}
+.custom-color {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 52px;
+  margin-top: var(--s2);
+  padding: 6px var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+}
+.cc-preview {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  background: var(--cc, #00ff00);
+}
+.cc-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 600;
+}
+.cc-text output {
+  color: var(--muted);
+  font: 12px var(--mono);
+  text-transform: uppercase;
+}
+.custom-color input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.custom-color:focus-within {
+  border-color: var(--accent);
+}
+
+/* tempo */
+.bpm-card {
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+}
+.bpm-read {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+}
+.bpm-read output {
+  font: 600 34px/1.1 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.bpm-read span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+.bpm-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: var(--s3) 0 var(--s1);
+}
+.round {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  font-size: 22px;
+  line-height: 1;
+}
+.tap {
+  flex: 1;
+  height: 52px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  touch-action: manipulation;
+}
+.tap.flash,
+.live-tap.flash {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+#fx-speed.dim {
+  opacity: 0.45;
+}
+
+/* text */
+.text-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--inset);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.text-input::placeholder {
+  color: var(--faint);
+}
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* drawing: Deshacer / Borrar beside the heading (never below the fold: the pad blocks scroll gestures), the pad
+   below fits the visible panel: 1 px border + 16 px margin + 44 px head + 12 px gap + slack = 80 px */
+.draw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: var(--s4) 0 var(--s3);
+}
+.draw-head h3 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+.draw-tools {
+  flex: none;
+  display: flex;
+  gap: var(--s2);
+}
+.draw-wrap {
+  display: flex;
+  justify-content: center;
+}
+.draw-canvas {
+  display: block;
+  width: min(100%, 340px, max(150px, calc(var(--panel-h) - 80px)));
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: #000;
+  touch-action: none;
+}
+.btn-row {
+  display: flex;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+/* settings */
+.dac-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dac-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin-bottom: 6px;
+  padding: 10px var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--panel-2);
+}
+.dac-list li span {
+  color: var(--muted);
+  font: 11px var(--mono);
+  text-transform: uppercase;
+}
+.safety-note {
+  margin-top: var(--s5);
+  padding: var(--s3) 14px;
+  border: 1px solid var(--warn-line);
+  border-radius: var(--r-lg);
+  background: var(--warn-soft);
+  color: #e9dfc9;
+  font-size: 13px;
+}
+.safety-note strong {
+  display: block;
+  margin-bottom: var(--s1);
+  color: var(--warn);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+kbd {
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--panel-2);
+  font: 11px var(--mono);
+}
+
+/* ---------- toast & modals ---------- */
+.toast {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: calc(var(--sab) + 70px);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  padding: 10px var(--s4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none; /* informational only: never blocks a control under it (above all the arm / blackout) */
+}
+.toast.error {
+  border-color: var(--live);
+  background: #2a1210;
+  color: #ffd6d3;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--s4) var(--s4) calc(var(--s4) + var(--sab));
+  background: rgba(0, 0, 0, 0.62);
+}
+.modal {
+  width: min(100%, 420px);
+  padding: var(--s4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+.modal h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.modal p {
+  margin: 0 0 var(--s3);
+  color: var(--muted);
+  font-size: 13px;
+}
+.modal input {
+  width: 100%;
+  min-height: var(--hit);
+  margin-bottom: var(--s3);
+  padding: 8px var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--inset);
+  font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.modal input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.modal .btn-row {
+  margin-top: var(--s1);
+}
+.modal .sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+/* ---------- narrow phones: keep the strip on one line ---------- */
+@media (max-width: 420px) {
+  .strip {
+    gap: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .brand {
+    gap: 5px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+  .strip-fill {
+    display: none;
+  }
+  .stat-perf {
+    margin-left: auto;
+  }
+  .badge {
+    padding: 0 6px;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+  }
+  .arm-state {
+    padding: 3px 5px;
+    letter-spacing: 0.04em;
+  }
+  .stat-perf {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-size: 10px;
+  }
+  .stat-perf .sep {
+    display: none;
+  }
+}
+@media (max-width: 379px) {
+  .brand-name {
+    display: none; /* the mark stays, labelled "Helios Web Control" */
+  }
+}
+@media (max-width: 359px) {
+  .draw-tools .btn-label {
+    display: none; /* icon buttons, named by their aria-label */
+  }
+}
+@media (max-width: 330px) {
+  .stat-bpm {
+    display: none; /* the live bar shows the tempo */
+  }
+}
+
+/* ---------- phone portrait, short screens (browser bars, small phones) ----------
+   TAP and the effect chip move beside the preview (the room a height-limited square leaves), the colours stay in
+   one row under the arm. Fixed rows (--chrome-v): strip 41 + stage 134 (padding 16, arm 52, colours 50, two 8 px
+   gaps) + tab bar 55 = 230 px. The panel keeps 280 px on screens from ~650 px tall; below that the preview stops at
+   a quarter of the height (130 px at least) and the panel gets the rest (about 200 px on a 360x560 screen).
+   The query is the phone-portrait layout region (neither the phone-landscape nor the tablet query) up to 760 px. */
+@media (max-width: 519px) and (max-height: 760px),
+  (max-width: 599px) and (min-height: 520px) and (max-height: 760px) {
+  :root {
+    --chrome-v: 230px;
+    --pv: min(
+      calc(100vw - 24px - 128px - var(--sal) - var(--sar)),
+      max(
+        130px,
+        calc(var(--vh100) * 0.25 - 10px),
+        calc(var(--vh100) - var(--chrome-v) - 280px - var(--sat) - var(--sab))
+      )
+    );
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: var(--pv) minmax(0, 1fr);
+    grid-template-areas: "pv live" "arm arm" "qc qc";
+    align-items: stretch;
+  }
+  .preview-wrap {
+    grid-area: pv;
+  }
+  .arm {
+    grid-area: arm;
+  }
+  .quick-colors {
+    grid-area: qc;
+  }
+  .livebar {
+    grid-area: live;
+    flex-direction: column;
+  }
+  .live-tap,
+  .fx-chip {
+    flex: 1 1 0;
+  }
+  .draw-canvas {
+    width: min(
+      100%,
+      340px,
+      calc(var(--panel-h) - 80px)
+    ); /* no 150 px floor: the panel is under 230 px here */
+  }
+}
+
+/* ---------- phone landscape: preview + arm + live bar on the left, panels on the right ---------- */
+@media (orientation: landscape) and (max-height: 519px) and (min-width: 520px) {
+  :root {
+    --side: 184px; /* 4 colours per row, 44 px each */
+    --pv: max(
+      140px,
+      min(
+        calc(var(--vh100) - 56px - var(--sat) - var(--sab)),
+        calc(100vw - 340px - var(--side) - 32px - var(--sal) - var(--sar))
+      )
+    );
+    --panel-h: calc(
+      var(--vh100) - var(--strip-h) - 47px - var(--sat) - var(--sab)
+    );
+  }
+  #app {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "strip strip" "stage panel" "stage tabs";
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: var(--pv) var(--side);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "pv arm" "pv qc" "pv live";
+    align-content: start;
+    align-items: start;
+    gap: var(--s2);
+    padding: var(--s2) var(--s3) calc(var(--s2) + var(--sab));
+    border-right: 1px solid var(--border);
+  }
+  /* the offline banner covers the preview only, never the arm beside it */
+  .banner {
+    right: auto;
+    width: var(--pv);
+  }
+  .preview-wrap {
+    grid-area: pv;
+  }
+  .arm {
+    grid-area: arm;
+    width: auto;
+    min-height: 60px;
+    padding: 6px 10px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .quick-colors {
+    grid-area: qc;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: auto;
+  }
+  .livebar {
+    grid-area: live;
+    flex-direction: column;
+    width: auto;
+  }
+  .cues-pane,
+  .panel {
+    border-top: 0;
+  }
+  .tabbar button {
+    min-height: 46px;
+    gap: 2px;
+  }
+  .tabbar svg {
+    width: 19px;
+    height: 19px;
+  }
+  .toast {
+    /* over the panel column, clear of the stage */
+    left: calc(
+      (var(--pv) + var(--side) + 32px + var(--sal) + 100vw - var(--sar)) / 2
+    );
+    bottom: calc(var(--sab) + 58px);
+    max-width: calc(
+      100vw - var(--pv) - var(--side) - 64px - var(--sal) - var(--sar)
+    );
+  }
+}
+/* small phones in landscape (iPhone SE / 8 at 667x375): the preview is width-limited, so TAP and the effect chip go
+   under it and the side column narrows to the arm and two colours per row, which lets the preview grow */
+@media (orientation: landscape) and (max-height: 519px) and (min-width: 520px) and (max-width: 740px) {
+  :root {
+    --side: 150px;
+    --pv: max(
+      120px,
+      min(
+        calc(var(--vh100) - 56px - 104px - var(--sat) - var(--sab)),
+        calc(100vw - 300px - var(--side) - 32px - var(--sal) - var(--sar))
+      )
+    );
+  }
+  .stage {
+    grid-template-areas: "pv arm" "pv qc" "live qc";
+  }
+  .quick-colors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- tablet / small laptop: two columns, cues always visible on the left ---------- */
+@media (min-width: 600px) and (min-height: 520px) {
+  :root {
+    --colL: calc(50vw - (var(--sal) + var(--sar)) / 2);
+    --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 560px)));
+    --panel-h: calc(
+      var(--vh100) - var(--strip-h) - 57px - var(--sat) - var(--sab)
+    );
+  }
+  #app {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "strip strip" "stage ctrl" "cues ctrl";
+  }
+  .strip {
+    gap: var(--s3);
+    padding-left: var(--s4);
+    padding-right: var(--s4);
+  }
+  .stat {
+    font-size: 12px;
+  }
+  .arm-state {
+    font-size: 11px;
+  }
+  .stage {
+    padding: var(--s4) var(--s4) var(--s3);
+  }
+  .arm,
+  .quick-colors,
+  .livebar {
+    width: max(var(--pv), 360px); /* at least 44 px per quick colour */
+  }
+  .arm {
+    min-height: 56px;
+    font-size: 14px;
+  }
+  .cues-pane {
+    grid-area: cues;
+    padding: var(--s3) var(--s4) var(--s4);
+    border-top: 0;
+    background: transparent;
+  }
+  .ctrl {
+    grid-area: ctrl;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .tabbar {
+    flex: none;
+    padding: 0 var(--s2);
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabbar [data-tab="cues"] {
+    display: none;
+  }
+  .tabbar button {
+    min-height: 56px;
+    font-size: 11.5px;
+  }
+  .tabbar button[aria-selected="true"]::before {
+    top: auto;
+    bottom: -1px;
+    left: 14%;
+    right: 14%;
+    border-radius: 2px 2px 0 0;
+  }
+  .panel {
+    flex: 1;
+    border-top: 0;
+    padding: 0 var(--s5) var(--s5);
+  }
+  .toast {
+    bottom: calc(var(--sab) + var(--s5));
+  }
+  .modal-backdrop {
+    align-items: center;
+  }
+}
+/* tablet in landscape: all 16 cues in two rows under the stage */
+@media (orientation: landscape) and (min-width: 600px) and (max-width: 1099px) and (min-height: 520px) {
+  .cue-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .cue .num {
+    display: none; /* narrow tiles: the name gets the room (the slot number is in its aria-label) */
+  }
+  .cue .meta {
+    padding: 3px 5px 4px;
+  }
+  .cue .name {
+    font-size: 10.5px;
+  }
+}
+
+/* ---------- desktop: preview | cues | controls, all visible at once ---------- */
+@media (min-width: 1100px) and (min-height: 520px) {
+  :root {
+    --colL: clamp(340px, 32vw, 520px);
+    --colR: clamp(360px, 30vw, 460px);
+    --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 272px)));
+  }
+  #app {
+    grid-template-columns: var(--colL) minmax(0, 1fr) var(--colR);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "strip strip strip" "stage cues ctrl";
+  }
+  .stage {
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+  }
+  .arm,
+  .quick-colors,
+  .livebar {
+    width: var(--pv);
+  }
+  .cues-pane {
+    padding: var(--s4) var(--s5) var(--s5);
+  }
+  .cues-pane > * {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .cues-pane > .hint.small {
+    margin-top: var(--s3);
+  }
+  .cue-grid {
+    gap: var(--s3);
+  }
+  .cue .art {
+    aspect-ratio: 1; /* larger thumbnails: the centre column has the height for it */
+  }
+  .cue .meta {
+    padding: 6px 8px 7px;
+  }
+  .cue .num {
+    font-size: 11px;
+  }
+  .cue .name {
+    font-size: 12.5px;
+  }
+  .cue .glyph svg {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (min-width: 1100px) and (min-height: 520px) and (hover: hover) and (pointer: fine) {
+  .kbd-hint {
+    display: block;
+  }
+}

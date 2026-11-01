@@ -1,0 +1,13 @@
+{
+  "rewrites": [{ "source": "/static/:path*", "destination": "/:path*" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "Permissions-Policy", "value": "usb=(self)" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ]
+}

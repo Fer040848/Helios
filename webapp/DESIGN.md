@@ -1,0 +1,236 @@
+# Helios Web Control — design & contract
+
+A laser show controller (cue grid + live controls, in the spirit of desktop/mobile laser
+show apps) that runs on the computer the Helios DAC is plugged into, and is operated from a
+phone browser on the same Wi‑Fi. UI language: Spanish. Code, identifiers and comments: English.
+
+```
+ phone / tablet / PC browser  ──HTTP + WebSocket (LAN)──▶  python -m helios_web  ──ctypes──▶  libHeliosDacAPI  ──USB/IDN──▶  DAC ─▶ projector
+                                                                 └── simulator (no hardware) ──▶ preview only
+```
+
+## Layout
+
+```
+webapp/
+  DESIGN.md                this file
+  README.md                user guide (Spanish)
+  requirements.txt         aiohttp>=3.9  (the only runtime dependency)
+  scripts/build_helios_lib.sh   compiles sdk/cpp (current, HighRes+IDN) into webapp/lib/
+  helios_web/              Python package (backend)
+    __main__.py            CLI entry: python -m helios_web
+    geometry.py            stroke types, transforms, mirroring
+    font.py                single-stroke vector font
+    patterns.py            pattern registry
+    effects.py             motion effects + colour modes + beat clock
+    rasterize.py           strokes -> galvo-friendly point stream, safety
+    output.py              DAC backends: HeliosLibOutput (ctypes), SimulatedOutput
+    engine.py              state, cues, render thread
+    store.py               JSON persistence of settings + cues
+    server.py              aiohttp app: static, REST, WebSocket
+  static/                  frontend (vanilla HTML/CSS/JS, no build step, no CDN)
+    index.html  app.css  app.js  net.js  render.js  thumbs.js  manifest.webmanifest  icon.svg
+    engine/                JavaScript port of the engine (+ local.js backend and helios-usb.js for WebUSB)
+  tests/                   python -m unittest discover -s webapp/tests -t webapp
+    e2e/                   Playwright (Node, CommonJS) UI tests
+  data/                    runtime persistence (gitignored)
+  lib/                     locally built DAC library (gitignored)
+```
+
+## Conventions
+
+- Coordinates are floats, `x, y ∈ [-1, 1]`, `+y` is up, `(0,0)` is centre. Colours are floats `r, g, b ∈ [0, 1]`
+  inside the backend and ints `0..255` on the wire.
+- A **stroke** is a polyline: a list of `(x, y)` vertices plus a `closed` flag. A **coloured stroke** carries one
+  colour per vertex (the colour of the segment that starts at that vertex).
+- The server is the single source of truth. Clients send intents; the server validates, clamps, applies and
+  broadcasts the resulting full state.
+
+## Safety rules (non-negotiable)
+
+1. The server always starts **disarmed**. `armed` is never persisted.
+2. While disarmed, nothing is written to any DAC. Disarm / blackout calls `Stop()` and `SetShutter(0)` on every DAC.
+3. `settings.brightness` (master, default 0.3) multiplies every colour sent to the DAC.
+4. `settings.scanSize` (0.1–1, default 0.8) scales every output coordinate; results are clamped to [-1, 1].
+5. Beam safety (`settings.beamSafety`, default true): if the bounding box of the lit points of a frame is smaller
+   than 0.05 in both width and height (normalised units, full range = 2), the whole frame is blanked.
+6. Frames are written with `HELIOS_FLAGS_SINGLE_MODE` (value 2) so the DAC stops by itself if the server stalls.
+7. On shutdown (SIGINT/SIGTERM) the server stops, closes the shutter and closes all DACs.
+
+## Scene (what is drawn)
+
+All fields optional on input; the server merges partial updates, clamps numbers to range, ignores unknown keys
+and invalid enum values.
+
+| field          | type / range                                                                                     | default     | meaning                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `pattern`      | pattern id (see registry)                                                                        | `"circle"`  | base shape                                                                                                             |
+| `text`         | string, ≤ 64 chars                                                                               | `"HOLA"`    | used by `text` pattern                                                                                                 |
+| `textMode`     | `"static"` \| `"scroll"`                                                                         | `"static"`  |                                                                                                                        |
+| `drawing`      | list of strokes, each a list of `[x, y]`                                                         | `[]`        | used by `drawing` pattern, drawn 1:1 (`size` ignored); ≤ 2000 points total (server truncates)                                                      |
+| `size`         | 0–1                                                                                              | 0.6         | overall scale (1 = shape spans full range)                                                                             |
+| `x`, `y`       | -1–1                                                                                             | 0           | position                                                                                                               |
+| `rotation`     | -180–180 (degrees)                                                                               | 0           | static rotation                                                                                                        |
+| `spin`         | -360–360 (degrees / second)                                                                      | 0           | continuous rotation                                                                                                    |
+| `speed`        | 0–2                                                                                              | 1           | animation speed of animated patterns and text scroll                                                                   |
+| `color`        | `"#rrggbb"`                                                                                      | `"#00ff00"` | base colour                                                                                                            |
+| `colorMode`    | `solid` \| `rainbow` \| `cycle` \| `beat`                                                        | `"solid"`   | rainbow = hue along the path (moving); cycle = whole shape hue over time; beat = jump to next palette colour each beat |
+| `colorSpeed`   | 0–2                                                                                              | 0.5         |                                                                                                                        |
+| `effect`       | `none` \| `pulse` \| `wave` \| `orbit` \| `bounce` \| `zoom` \| `strobe` \| `wobble` \| `drawOn` | `"none"`    | motion effect                                                                                                          |
+| `effectAmount` | 0–1                                                                                              | 0.5         |                                                                                                                        |
+| `effectSpeed`  | 0–2                                                                                              | 0.5         | ignored when `beatSync` (period follows BPM)                                                                           |
+| `beatSync`     | bool                                                                                             | false       |                                                                                                                        |
+| `mirror`       | `none` \| `h` \| `v` \| `quad`                                                                   | `"none"`    | duplicate mirrored copies                                                                                              |
+
+Pattern registry (id → Spanish name): `circle` Círculo, `square` Cuadrado, `triangle` Triángulo, `star` Estrella,
+`heart` Corazón, `line` Línea, `spiral` Espiral, `wave` Onda, `lissajous` Lissajous, `tunnel` Túnel, `fan` Abanico,
+`grid` Rejilla, `flower` Flor, `text` Texto, `drawing` Dibujo. Effects / colour modes have Spanish names too
+(e.g. `pulse` Pulso, `wave` Ondulación, `orbit` Órbita, `bounce` Rebote, `zoom` Zoom, `strobe` Estrobo,
+`wobble` Vaivén, `drawOn` Trazado; `solid` Sólido, `rainbow` Arcoíris, `cycle` Ciclo, `beat` Al ritmo).
+
+## Settings (projector / output)
+
+| field                          | range      | default |                       |
+| ------------------------------ | ---------- | ------- | --------------------- |
+| `pps`                          | 1000–65535 | 30000   | points per second     |
+| `brightness`                   | 0–1        | 0.3     | master intensity      |
+| `scanSize`                     | 0.1–1      | 0.8     | output scan area      |
+| `invertX`, `invertY`, `swapXY` | bool       | false   | projector orientation |
+| `beamSafety`                   | bool       | true    | see safety rule 5     |
+
+Settings and cues persist to `data/state.json`. Scene does not persist (cues do).
+
+## Cues
+
+16 slots; `null` = empty. A cue is `{"name": str (≤ 24 chars), "scene": Scene}`. The first ~10 slots ship with
+sensible defaults (e.g. green circle, rainbow tunnel, spinning star, wave, text "HOLA", fan, lissajous, red heart,
+grid, spiral). Triggering a cue replaces the live scene with the cue's scene (merged over scene defaults) and sets
+`activeCue`. Any later `scene` message clears `activeCue` to `null`.
+
+## HTTP
+
+- `GET /` → `static/index.html`; `GET /static/<file>` → static files.
+- `GET /api/state` → the `state` object (same shape as the WebSocket `state.state`).
+- `GET /ws` → WebSocket.
+- Default bind `0.0.0.0:8080`; at start-up the server prints the LAN URL(s) to open on the phone.
+
+## WebSocket protocol (JSON text messages)
+
+Server → client:
+
+- `{"type": "state", "state": State}` — sent on connect and after every change (coalesced to ≤ 10 per second).
+- `{"type": "frame", "strokes": [[x, y, r, g, b, x, y, r, g, b, ...], ...], "fps": float, "points": int,
+  "blanked": bool}` — ~20 per second to every client, whether armed or not. Strokes are the coloured strokes after
+  effects, mirroring and the output transform (scanSize, invert, swap), colours before brightness, x/y rounded to 3
+  decimals, r/g/b ints 0–255, ≤ 1500 vertices in total (downsampled if needed). Empty `strokes` when beam safety
+  blanks the frame. `fps` = frames per second actually rendered; `points` = points in the last frame written /
+  rasterised; `blanked` = true when beam safety blanked this frame (the UI shows "PROTECCIÓN DE HAZ — CUADRO
+  APAGADO" over the preview), false otherwise (also when the frame is simply dark). Python:
+  `rasterize.build_frame_ex(...) -> (preview, points, blanked)`; JS: `buildFrame(...) -> {preview, points, blanked}`.
+- `{"type": "error", "message": str}` — invalid message; the connection stays open.
+
+Client → server:
+
+| message                                                | effect                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `{"type": "scene", "scene": {partial Scene}}`          | merge into live scene; `activeCue = null`                                                        |
+| `{"type": "settings", "settings": {partial Settings}}` | merge, persist                                                                                   |
+| `{"type": "arm", "armed": bool}`                       | arm / disarm output                                                                              |
+| `{"type": "blackout"}`                                 | disarm immediately                                                                               |
+| `{"type": "cue", "index": int}`                        | trigger cue (ignored if slot empty)                                                              |
+| `{"type": "saveCue", "index": int, "name": str}`       | store current scene in slot, persist                                                             |
+| `{"type": "clearCue", "index": int}`                   | empty slot, persist                                                                              |
+| `{"type": "tap"}`                                      | tap tempo: BPM = 60 / mean of the last ≤ 4 intervals; taps more than 2 s apart restart the count |
+| `{"type": "bpm", "bpm": number}`                       | set BPM (40–240)                                                                                 |
+| `{"type": "rescan"}`                                   | re-open DACs (only while disarmed; else `error`)                                                 |
+
+State:
+
+```json
+{
+  "armed": false,
+  "simulated": true,
+  "dacs": [{ "index": 0, "name": "Helios 1", "kind": "usb" }],
+  "scene": { "...": "Scene" },
+  "settings": { "...": "Settings" },
+  "cues": [{ "name": "Círculo", "scene": {} }, null],
+  "activeCue": null,
+  "bpm": 120.0,
+  "patterns": [{ "id": "circle", "name": "Círculo" }],
+  "effects": [{ "id": "none", "name": "Ninguno" }],
+  "colorModes": [{ "id": "solid", "name": "Sólido" }]
+}
+```
+
+`dacs[].kind` is `usb`, `idn` or `sim`. With no hardware the server runs the simulator (`simulated: true`, one
+`sim` DAC) so the UI and preview work without a laser.
+
+## Output backends
+
+- `HeliosLibOutput(lib_path)` — ctypes `CDLL`. Uses `WriteFrameHighResolution` (16-bit XY/RGB) when the library
+  exports it, otherwise `WriteFrame` (12-bit XY, 8-bit RGBI; I = 255 when any colour is lit). Library search order:
+  `--lib`, `$HELIOS_LIB`, `webapp/lib/`, `sdk/cpp/shared_library/` (Windows `.dll`, macOS `.dylib`),
+  `sdk/examples/python/` (Linux `.so`). Per frame and DAC: poll `GetStatus` until 1 (bounded), then write.
+  Max points per frame 4095 (USB).
+- `SimulatedOutput` — accepts frames and paces the loop by the frame duration (`points / pps`).
+- If the library is missing or finds 0 DACs, the server falls back to the simulator and says so in the log;
+  `rescan` retries the hardware.
+
+## Rasteriser (strokes → points)
+
+Blanked moves between strokes (interpolated, then a few blanked dwell points at the target), lit points spaced
+evenly along each stroke, extra dwell points on sharp corners (> ~45°) and at stroke ends, closed strokes return to
+their first vertex. Each frame has at least `max(200, pps × 0.012)` points (pad by repeating) and at most 4095
+(resample coarser to fit). Then: brightness, scanSize, invert/swap, clamp, beam safety.
+
+## Published site (WebUSB, no server)
+
+`static/` is also deployed as a plain static site (Vercel, `static/vercel.json`, domain dac.ferchx.com). At start-up
+`net.js` reads `/static/runtime.json`: the Python server answers `{"mode": "server"}` (WebSocket transport); the
+static file says `{"mode": "webusb"}`, and the page instead loads `static/engine/local.js` — an in-browser backend that
+speaks the exact protocol above, with the engine ported to JavaScript (`static/engine/*.js`, point-for-point parity
+with the Python engine, enforced by `tests/js/engine.test.mjs`) and the DAC driven over WebUSB
+(`static/engine/helios-usb.js`, a port of the SDK's USB device: interface 0 alt 1, control on interrupt EP 0x06/0x83,
+frames on bulk EP 0x02). Its `state` adds `"transport": "webusb"` and `"usbSupported"`; `rescan` opens the browser's
+device picker. Same safety rules, plus: unplugging the DAC, a DAC that stops answering, or the page going to the
+background all black out. Only USB DACs (browsers cannot speak IDN/UDP).
+
+## Cue thumbnails
+
+`static/thumbs.js` draws a live mini preview of every filled cue in its tile, in the browser, with the pure JS engine
+(`mergeScene(SCENE_DEFAULTS, cue.scene)` → `compose(scene, clocks)`, one `Clocks` per cue, the state's BPM), in both
+transports. No output transform: it shows the figure, not the scan area. Because the WebUSB output loop shares the
+main thread, one rAF scheduler draws each thumbnail at ~8 fps at most, round-robin. Its budget is the real cost of a
+tick (the drawing calls plus the raster / upload of the changed canvases and the commit), measured from the tick to the
+first task after its frame minus a probed baseline frame: a tick draws what fits in ~6 ms of that (at least one
+thumbnail) and the scheduler then idles 5x the measured cost, so the thumbnails take about 1/6 of the main thread at
+most and a slow device gets slower thumbnails. A long frame of other work (GC, layout) is not charged to them: a sample
+counts at most 10x the drawing calls and the idle is at most 250 ms. It draws only tiles on screen (IntersectionObserver), never while the
+page is hidden, and switches to static
+frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and while `armed` with
+`transport: "webusb"`. `app.js` loads it with a dynamic `import()`: if it fails the tiles keep their pattern glyph.
+
+## UI layout and theme
+
+"Consola profesional": design tokens are CSS custom properties at the top of `static/app.css` (palette, 4/8/12/16/24
+spacing, radii); flat 1px-bordered panels, glow only in the laser preview and on the armed state; system fonts only.
+The status strip shows connection, DAC/SIMULADOR (a button to Ajustes, where the DAC is connected), fps · pts, BPM and
+the armed state. The arm / blackout control and
+the live bar sit next to the preview on every layout: 8 quick colours (one tap = that colour on the laser:
+`{type:"scene", scene:{color, colorMode:"solid"}}`; a colour shows as selected only in solid mode, since rainbow /
+cycle / beat ignore the base colour; it follows the Color tab, grace period included), TAP → `{type:"tap"}` with the BPM, and a chip with the current effect that opens
+the Efecto tab. They use the same messages as the panels, so they work in both transports. Armed labels are white on
+`--live-fill` (#d92d20, 4.8:1); `--live` (#ff3b30) is for borders, glow and dots. Nothing animates a property the
+compositor cannot run (no box-shadow pulses): in WebUSB mode the output loop shares the main thread. Touch targets
+are at least 44 px tall.
+
+| Layout                                              | Arrangement                                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| phone portrait (default, height > 760 px)           | strip, preview, arm, quick colours, TAP + effect, then the panel (≥ 280 px) with a bottom tab bar (Cues is a tab) |
+| phone portrait, short (height ≤ 760 px)             | TAP + effect beside the preview, then arm and quick colours; the panel keeps 280 px down to ~650 px of height, the preview then stops at a quarter of the height (≥ 130 px) |
+| phone landscape (`landscape`, height < 520 px)      | preview + arm/colours/live bar column on the left, panel and tab bar on the right; up to 740 px wide TAP + effect go under the preview |
+| tablet / small laptop (width ≥ 600, height ≥ 520)   | left: preview, arm, live bar, cue grid; right: tabs on top of the panel      |
+| desktop (width ≥ 1100, height ≥ 520)                | preview + arm + live bar · cue grid 4×4 · tabs + panel, all visible at once  |
+
+On tablet and desktop the Cues tab is hidden and the cue grid is always shown; `app.js` uses the same media query
+(`wideQuery`) to decide which pages are visible.
