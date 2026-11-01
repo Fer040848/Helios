@@ -1660,6 +1660,9 @@ kbd {
   .fx-chip {
     flex: 1 1 0;
   }
+  .draw-canvas {
+    width: min(100%, 340px, calc(var(--panel-h) - 80px)); /* no 150 px floor: the panel is under 230 px here */
+  }
 }
 
 /* ---------- phone landscape: preview + arm + live bar on the left, panels on the right ---------- */
