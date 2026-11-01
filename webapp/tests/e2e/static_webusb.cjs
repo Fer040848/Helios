@@ -72,6 +72,21 @@ const FAKE_USB = () => {
       for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++;
       return n;
     });
+    // Cue thumbnails: per filled tile, the number of lit pixels and a hash of the pixels (null for empty slots).
+    const thumbs = (p = page) => p.evaluate(() => [...document.querySelectorAll('.cue')].map((b) => {
+      const c = b.querySelector('canvas.thumb');
+      if (b.classList.contains('empty') || !c || !c.width) return null;
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let lit = 0, hash = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = d[i] + d[i + 1] + d[i + 2];
+        if (v > 60) lit++;
+        hash = (Math.imul(hash, 31) + v) | 0;
+      }
+      return { lit, hash };
+    }));
+    const changed = (a, b) => a.filter((t, i) => t && b[i] && t.hash !== b[i].hash).length;
+    const thumbRenders = (p = page) => p.evaluate(async () => (await import('/static/thumbs.js')).stats.renders);
     const setRange = (key, v) => page.evaluate(([k, v]) => {
       const input = document.querySelector(`[data-key="${k}"] input`);
       input.value = v;
@@ -89,6 +104,15 @@ const FAKE_USB = () => {
     assert(lit > 200, `in-browser engine draws the preview (${lit} lit pixels)`);
     assert((await page.locator('#scan-label').textContent()) === 'ÁREA DE ESCANEO 80%', 'scan-area label shows the scan size (80%)');
     assert(await page.locator('#blank-badge').isHidden(), 'no beam-safety badge while the frame is drawn');
+
+    // Cue thumbnails: the filled cues show their own live, animated figure.
+    const th0 = await thumbs();
+    const litTiles = th0.filter((t) => t && t.lit >= 10).length;
+    assert(litTiles >= 10, `thumbnails: ${litTiles} filled cue tiles draw their figure`);
+    await sleep(500);
+    const moving = changed(th0, await thumbs());
+    assert(moving >= 6, `thumbnails animate while disarmed (${moving} of ${litTiles} changed in 0.5 s)`);
+    await page.screenshot({ path: path.join(OUT, 'web-usb-cues.png') });
 
     // Beam safety: a collapsed shape (size 0) is blanked and the preview says so; a normal size brings it back.
     await tab('shape');
@@ -131,6 +155,12 @@ const FAKE_USB = () => {
     assert(frames.length > 3, `armed: frames go to the DAC over USB (${frames.length})`);
     assert(frames.every((f) => f.flags === 2 && (f.n - 5) % 7 === 0), 'frames are Helios-format with SINGLE_MODE');
     await page.screenshot({ path: path.join(OUT, 'web-usb-armed.png') });
+    // armed in WebUSB mode: the thumbnails freeze so nothing competes with the output loop on the main thread
+    const [armedThumbs, armedRenders] = [await thumbs(), await thumbRenders()];
+    await sleep(600);
+    assert(changed(armedThumbs, await thumbs()) === 0 && (await thumbRenders()) === armedRenders,
+      'armed (WebUSB): cue thumbnails stop updating');
+    assert(armedThumbs.filter((t) => t && t.lit >= 10).length >= 10, 'armed (WebUSB): thumbnails keep their last frame');
 
     await touch('touchStart', b.x + b.width / 2, b.y + b.height / 2); await touch('touchEnd');
     await page.waitForFunction(() => !document.getElementById('arm-label').textContent.startsWith('EN VIVO'), null, { timeout: 3000 });
@@ -141,11 +171,53 @@ const FAKE_USB = () => {
     const count = log.filter((e) => e.ep === 2).length;
     await sleep(300);
     assert((await usb()).filter((e) => e.ep === 2).length === count, 'no frames after blackout');
+    const after = await thumbs();
+    await sleep(500);
+    assert(changed(after, await thumbs()) >= 6, 'disarmed again: thumbnails animate again');
 
-    const noUsb = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+    // Cost of the thumbnail scheduler with all 16 slots filled (heavy figures included), every tile on screen.
+    const heavy = (scene) => ({ name: 'Pesado', scene });
+    const drawing = [Array.from({ length: 2000 }, (_, i) => [(0.1 + 0.8 * i / 2000) * Math.cos(i * 0.02), (0.1 + 0.8 * i / 2000) * Math.sin(i * 0.02)])]; // a finger spiral, max points
+    const cues16 = [
+      ...[['circle', '#00ff00'], ['tunnel'], ['star', '#ffff00'], ['wave', '#0088ff'], ['text', '#ff00ff'], ['fan', '#00ffff'],
+        ['lissajous'], ['heart', '#ff0000'], ['grid', '#00ff00'], ['spiral']].map(([pattern, color]) =>
+        ({ name: pattern, scene: color ? { pattern, color, spin: 45 } : { pattern, colorMode: 'rainbow', spin: 45 } })),
+      heavy({ pattern: 'text', text: 'LASER SHOW HELIOS WEB CONTROL 0123456789 ÑANDÚ ÁÉÍÓÚ ABCDEFGHIJKLMNOP', colorMode: 'rainbow', mirror: 'quad', textMode: 'scroll' }),
+      heavy({ pattern: 'flower', colorMode: 'rainbow', mirror: 'quad', effect: 'wave', effectAmount: 1 }),
+      heavy({ pattern: 'drawing', drawing, colorMode: 'rainbow', effect: 'wobble' }),
+      heavy({ pattern: 'grid', colorMode: 'rainbow', mirror: 'quad', effect: 'wave' }),
+      heavy({ pattern: 'tunnel', colorMode: 'rainbow', mirror: 'h', effect: 'zoom', spin: 120 }),
+      heavy({ pattern: 'lissajous', colorMode: 'beat', effect: 'drawOn', beatSync: true }),
+    ];
+    const perfCtx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+    await perfCtx.addInitScript((cues) => localStorage.setItem('helios-web/v1', JSON.stringify({ cues })), cues16);
+    const perf = await perfCtx.newPage();
+    perf.on('pageerror', (e) => errors.push(String(e)));
+    await perf.goto(server.url);
+    await perf.waitForFunction(() => document.querySelectorAll('.cue:not(.empty)').length === 16, null, { timeout: 5000 });
+    await sleep(1000); // warm up (JIT, first frames)
+    await perf.evaluate(async () => Object.assign((await import('/static/thumbs.js')).stats, { ticks: 0, renders: 0, busyMs: 0, maxMs: 0 }));
+    await sleep(3000);
+    const st = await perf.evaluate(async () => ({ ...(await import('/static/thumbs.js')).stats }));
+    const avgTick = st.busyMs / st.ticks, perRender = st.busyMs / st.renders;
+    console.log(`# thumbnail scheduler, 16 cues: ${st.ticks} ticks in 3 s, ${avgTick.toFixed(2)} ms/tick avg, ` +
+      `${st.maxMs.toFixed(1)} ms max, ${(st.renders / st.ticks).toFixed(1)} renders/tick, ${perRender.toFixed(2)} ms/render ` +
+      `(all 16 once: ~${(16 * perRender).toFixed(1)} ms of work, split across ticks by the 4 ms budget)`);
+    assert(avgTick < 6, `one scheduler tick costs under 6 ms on average (${avgTick.toFixed(2)} ms)`);
+    assert(st.renders / 3 >= 16 * 4, `16 thumbnails keep animating (${(st.renders / 3 / 16).toFixed(1)} fps each)`);
+    assert((await thumbs(perf)).filter((t) => t && t.lit >= 10).length >= 15, '16 cues: the thumbnails draw their figures');
+    await perf.screenshot({ path: path.join(OUT, 'web-usb-cues16.png') });
+
+    const noUsb = await (await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })).newPage();
     await noUsb.addInitScript(() => Object.defineProperty(navigator, 'usb', { value: undefined }));
     await noUsb.goto(server.url);
     await noUsb.waitForFunction(() => document.querySelectorAll('.cue').length === 16, null, { timeout: 5000 });
+    await noUsb.waitForFunction(() => !document.body.classList.contains('offline'), null, { timeout: 5000 });
+    await sleep(500);
+    const still = await thumbs(noUsb);
+    await sleep(500);
+    assert(still.filter((t) => t && t.lit >= 10).length >= 10 && changed(still, await thumbs(noUsb)) === 0,
+      'prefers-reduced-motion: thumbnails are static frames');
     await noUsb.locator('[data-tab="settings"]').click();
     await sleep(200);
     assert(await noUsb.locator('#rescan').isDisabled(), 'without WebUSB (e.g. iPhone) the connect button is disabled');

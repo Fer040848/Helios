@@ -140,7 +140,7 @@ function schedule() {
       wait = 0;
       break;
     }
-    if (animating()) wait = Math.min(wait, t.next - SLACK_MS - now);
+    if (animating()) wait = Math.min(wait, t.next - now);
   }
   if (wait === Infinity) return; // nothing to draw: the scheduler stops until something changes
   if (wait <= 1) raf = requestAnimationFrame(tick);

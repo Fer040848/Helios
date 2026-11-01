@@ -395,7 +395,7 @@ h3 {
   text-align: center;
 }
 
-/* Cues */
+/* Cues: tile = live thumbnail (thumbs.js; the pattern glyph until it loads) + number and name */
 .cue-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -403,65 +403,111 @@ h3 {
 }
 .cue {
   position: relative;
-  min-height: 64px;
-  aspect-ratio: 1 / 0.82;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--s2);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 6px 4px 9px;
+  min-height: 64px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+  text-align: left;
   overflow: hidden;
   -webkit-touch-callout: none;
   touch-action: manipulation;
 }
-.cue .num {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  font-size: 10px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+.cue .art {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-bottom: 1px solid var(--line);
 }
-.cue svg {
+.cue .glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cue .glyph svg {
   width: 24px;
   height: 24px;
   color: var(--c, var(--acc));
-  filter: drop-shadow(0 0 4px var(--c, var(--acc)));
+}
+.cue .thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cue .meta {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 6px 5px;
+}
+.cue .num {
+  flex: none;
+  font:
+    10px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .cue .name {
+  min-width: 0;
   font-size: 11px;
   font-weight: 600;
-  max-width: 100%;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cue .bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: var(--c, var(--acc));
-  box-shadow: 0 0 8px var(--c, var(--acc));
-}
 .cue.empty {
   background: transparent;
-  border: 1.5px dashed #2b3449;
+  border: 1px dashed #2b3449;
   color: #3d475e;
+}
+.cue.empty .art {
+  visibility: hidden;
+  border-bottom-color: transparent;
 }
 .cue.empty .name {
   font-weight: 400;
 }
+/* selection / focus ring drawn over the thumbnail, so it does not resize the canvas */
+.cue::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
 .cue.active {
-  border: 2px solid var(--acc);
+  border-color: var(--acc);
+}
+.cue.active::after {
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+.cue.active .meta {
+  background: rgba(0, 229, 255, 0.12);
+}
+.cue.active .name {
+  color: var(--acc);
+}
+.cue:focus-visible {
+  outline: none;
+}
+.cue:focus-visible::after {
   box-shadow:
-    0 0 16px rgba(0, 229, 255, 0.55),
-    inset 0 0 18px rgba(0, 229, 255, 0.18);
+    inset 0 0 0 2px var(--acc),
+    inset 0 0 0 3px #000;
 }
 .cue:active {
   transform: scale(0.96);
@@ -1098,8 +1144,10 @@ kbd {
     font-size: 13px;
     letter-spacing: 0.06em;
   }
-  .cue {
-    aspect-ratio: auto;
-    min-height: 64px;
+}
+/* Wide landscape (tablets, desktop): all 16 cues in two rows */
+@media (orientation: landscape) and (min-width: 1000px) {
+  .cue-grid {
+    grid-template-columns: repeat(8, 1fr);
   }
 }

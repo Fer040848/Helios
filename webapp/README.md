@@ -16,7 +16,7 @@ usarla como app.
 
 | Pestaña     | Qué hace                                                                                                                                                                                                   |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cues**    | Cuadrícula de 16 cues (presets). Toca para disparar. Modo _Guardar_ para guardar la escena actual en un cue; mantén presionado un cue para renombrarlo o borrarlo.                                         |
+| **Cues**    | Cuadrícula de 16 cues (presets), cada uno con una miniatura animada de su figura. Toca para disparar. Modo _Guardar_ para guardar la escena actual en un cue; mantén presionado un cue para renombrarlo o borrarlo. |
 | **Forma**   | Círculo, cuadrado, triángulo, estrella, corazón, línea, espiral, onda, Lissajous, túnel, abanico, rejilla, flor, texto y dibujo. Tamaño, rotación, giro continuo, velocidad, posición con pad XY y espejo. |
 | **Color**   | Colores rápidos, selector de color y modos: sólido, arcoíris, ciclo y al ritmo.                                                                                                                            |
 | **Efecto**  | Pulso, ondulación, órbita, rebote, zoom, estrobo, vaivén y trazado. Intensidad, velocidad, BPM con botón **TAP** y sincronía al ritmo.                                                                     |
@@ -124,6 +124,6 @@ Los láseres de show pueden causar daño ocular permanente. Esta app ayuda, pero
 - Arquitectura y protocolo (HTTP + WebSocket): [`DESIGN.md`](DESIGN.md).
 - Pruebas del backend: `cd webapp && python -m unittest discover -s tests -t . -v`
 - Prueba de la interfaz con un backend simulado (Playwright para Node): `node tests/e2e/ui_mock.cjs`
-- Versión web (WebUSB simulado en el navegador): `node tests/e2e/static_webusb.cjs`
+- Versión web (WebUSB simulado en el navegador, miniaturas de cues y su costo por tick): `node tests/e2e/static_webusb.cjs`
 - Motor JavaScript (paridad exacta con Python y seguridad WebUSB): `node --test tests/js/engine.test.mjs`
 - Prueba de punta a punta con el servidor real: `PYTHON=.venv/bin/python node tests/e2e/integration.cjs`

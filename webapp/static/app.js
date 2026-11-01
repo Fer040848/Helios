@@ -12,6 +12,7 @@ const HOLD_MS = 600,
 
 let S = null; // last server state (single source of truth)
 let online = false; // socket open and a state received on it
+let thumbs = null; // thumbs.js once loaded (live cue thumbnails)
 const busy = new Map(); // control key -> time until incoming state must not overwrite it (Infinity while touched)
 const isBusy = (k) => (busy.get(k) ?? 0) > performance.now();
 const hold = (k) => busy.set(k, Infinity);
@@ -469,8 +470,10 @@ let saveMode = false;
 for (let i = 0; i < CUES; i++) {
   const b = document.createElement("button");
   b.type = "button";
-  b.className = "cue";
+  b.className = "cue empty";
   b.dataset.index = i;
+  // art: the pattern glyph, covered by the live thumbnail once thumbs.js has loaded (the glyph is the fallback)
+  b.innerHTML = `<span class="art"><span class="glyph"></span></span><span class="meta"><span class="num">${i + 1}</span><span class="name">Vacío</span></span>`;
   let timer = 0,
     longFired = false,
     x0 = 0,
@@ -514,20 +517,38 @@ function renderCues() {
         ? "var(--acc2)"
         : c?.scene?.color || "",
     );
-    const html = c
-      ? `<span class="num">${i + 1}</span>${glyph(c.scene?.pattern)}<span class="name">${esc(c.name)}</span><span class="bar"></span>`
-      : `<span class="num">${i + 1}</span><span class="name">Vacío</span>`;
-    if (b.dataset.html !== html) {
-      b.innerHTML = html;
-      b.dataset.html = html;
+    const g = $(".glyph", b),
+      art = c ? glyph(c.scene?.pattern) : "";
+    if (g.dataset.html !== art) {
+      g.innerHTML = art;
+      g.dataset.html = art;
     }
+    const name = $(".name", b),
+      label = c ? c.name : "Vacío";
+    if (name.textContent !== label) name.textContent = label;
     b.setAttribute(
       "aria-label",
       c ? `Cue ${i + 1}: ${c.name}` : `Cue ${i + 1}: vacío`,
     );
     b.setAttribute("aria-pressed", S?.activeCue === i);
   });
+  try {
+    thumbs?.update(S);
+  } catch (err) {
+    console.warn("cue thumbnails:", err); // never let them break the state update
+  }
 }
+// Live cue thumbnails, loaded on the side: if the module cannot load, the cues keep their glyphs and nothing else
+// (above all the arm / blackout control) depends on it.
+import("./thumbs.js")
+  .then((m) => {
+    $$(".cue", cueGrid).forEach((b, i) => m.attach(i, $(".art", b)));
+    thumbs = m;
+    renderCues();
+  })
+  .catch(() => {
+    /* glyph fallback */
+  });
 function setSaveMode(on) {
   saveMode = on;
   $("#save-mode").setAttribute("aria-pressed", on);

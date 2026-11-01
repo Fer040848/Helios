@@ -29,7 +29,8 @@ webapp/
     store.py               JSON persistence of settings + cues
     server.py              aiohttp app: static, REST, WebSocket
   static/                  frontend (vanilla HTML/CSS/JS, no build step, no CDN)
-    index.html  app.css  app.js  manifest.webmanifest  icon.svg
+    index.html  app.css  app.js  net.js  render.js  thumbs.js  manifest.webmanifest  icon.svg
+    engine/                JavaScript port of the engine (+ local.js backend and helios-usb.js for WebUSB)
   tests/                   python -m unittest discover -s webapp/tests -t webapp
     e2e/                   Playwright (Node, CommonJS) UI tests
   data/                    runtime persistence (gitignored)
@@ -193,3 +194,13 @@ with the Python engine, enforced by `tests/js/engine.test.mjs`) and the DAC driv
 frames on bulk EP 0x02). Its `state` adds `"transport": "webusb"` and `"usbSupported"`; `rescan` opens the browser's
 device picker. Same safety rules, plus: unplugging the DAC, a DAC that stops answering, or the page going to the
 background all black out. Only USB DACs (browsers cannot speak IDN/UDP).
+
+## Cue thumbnails
+
+`static/thumbs.js` draws a live mini preview of every filled cue in its tile, in the browser, with the pure JS engine
+(`mergeScene(SCENE_DEFAULTS, cue.scene)` → `compose(scene, clocks)`, one `Clocks` per cue, the state's BPM), in both
+transports. No output transform: it shows the figure, not the scan area. Because the WebUSB output loop shares the
+main thread, one rAF scheduler draws each thumbnail at ~8 fps within a ~4 ms budget per tick (at least one thumbnail,
+round-robin), only for tiles on screen (IntersectionObserver), never while the page is hidden, and switches to static
+frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and while `armed` with
+`transport: "webusb"`. `app.js` loads it with a dynamic `import()`: if it fails the tiles keep their pattern glyph.
