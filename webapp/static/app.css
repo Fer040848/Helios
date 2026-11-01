@@ -196,6 +196,10 @@ body:not(.offline) #conn-label {
   letter-spacing: 0.04em;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badge:hover {
+  border-color: var(--accent);
 }
 .badge.sim {
   color: var(--warn);

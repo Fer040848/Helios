@@ -981,6 +981,11 @@ function showTab(name) {
     /* storage unavailable */
   }
 }
+// The DAC badge leads to the DAC list and the connect button (Ajustes).
+$("#dac").addEventListener("click", () => {
+  showTab("settings");
+  $("#rescan").scrollIntoView({ block: "center" }); // with its hint below it
+});
 $(".tabbar").addEventListener("click", (e) => {
   const t = e.target.closest("[data-tab]");
   if (t) showTab(t.dataset.tab);

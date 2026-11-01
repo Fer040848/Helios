@@ -137,6 +137,16 @@ const FAKE_USB = () => {
     await setRange('settings.scanSize', 0.8);
     await page.waitForFunction(() => document.getElementById('scan-label').textContent === 'ÁREA DE ESCANEO 80%', null, { timeout: 3000 });
 
+    // The DAC badge in the status strip leads to the connect button.
+    await tab('cues');
+    await page.locator('#dac').tap();
+    await page.waitForSelector('#page-settings:not([hidden])');
+    assert((await page.locator('#tab-settings').getAttribute('aria-selected')) === 'true', 'tapping the DAC badge opens Ajustes');
+    const onScreen = await page.locator('#rescan').evaluate((el) => {
+      const r = el.getBoundingClientRect(), bar = document.querySelector('.tabbar').getBoundingClientRect();
+      return { ok: r.top >= 0 && r.bottom <= Math.min(innerHeight, bar.top) + 0.5, top: r.top, bottom: r.bottom, bar: bar.top };
+    });
+    assert(onScreen.ok, `...with the connect button on screen (${JSON.stringify(onScreen)})`);
     assert((await page.locator('#rescan span').textContent()) === 'Conectar DAC por USB', 'WebUSB connect button');
     await page.locator('#rescan').tap();
     await page.waitForFunction(() => document.getElementById('dac').textContent !== 'SIMULADOR', null, { timeout: 3000 });
