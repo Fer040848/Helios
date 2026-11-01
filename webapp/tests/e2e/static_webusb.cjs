@@ -64,20 +64,55 @@ const FAKE_USB = () => {
     const tab = async (name) => { await page.locator(`[data-tab="${name}"]`).tap(); await sleep(250); };
     const usb = () => page.evaluate(() => window.__usbLog);
 
-    await page.goto(server.url);
-    await page.waitForFunction(() => document.querySelectorAll('.cue').length === 16, null, { timeout: 5000 });
-    assert((await page.locator('#dac').textContent()) === 'SIMULADOR', 'static site starts on the simulator');
-    await sleep(500);
-    const lit = await page.evaluate(() => {
+    // Laser light in the preview: pixels brighter than the static guides (grid, crosshair, range, scan area) can be.
+    const litPixels = () => page.evaluate(() => {
       const c = document.getElementById('preview');
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
       let n = 0;
-      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++;
       return n;
     });
+    const setRange = (key, v) => page.evaluate(([k, v]) => {
+      const input = document.querySelector(`[data-key="${k}"] input`);
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, [key, v]);
+
+    await page.goto(server.url);
+    await page.waitForFunction(() => document.querySelectorAll('.cue').length === 16, null, { timeout: 5000 });
+    // the cue buttons exist before the engine has loaded: wait for its first state
+    await page.waitForFunction(() => !document.body.classList.contains('offline'), null, { timeout: 5000 });
+    assert((await page.locator('#dac').textContent()) === 'SIMULADOR', 'static site starts on the simulator');
+    await sleep(500);
+    const lit = await litPixels();
     assert(lit > 200, `in-browser engine draws the preview (${lit} lit pixels)`);
+    assert((await page.locator('#scan-label').textContent()) === 'ÁREA DE ESCANEO 80%', 'scan-area label shows the scan size (80%)');
+    assert(await page.locator('#blank-badge').isHidden(), 'no beam-safety badge while the frame is drawn');
+
+    // Beam safety: a collapsed shape (size 0) is blanked and the preview says so; a normal size brings it back.
+    await tab('shape');
+    await setRange('scene.size', 0);
+    await page.waitForSelector('#blank-badge', { state: 'visible', timeout: 3000 });
+    assert((await page.locator('#blank-badge').textContent()) === 'PROTECCIÓN DE HAZ — CUADRO APAGADO', 'size 0: beam-safety badge appears');
+    await sleep(200);
+    const dark = await litPixels();
+    assert(dark === 0, `blanked frame: the preview shows only the guides (${dark} lit pixels)`);
+    await page.screenshot({ path: path.join(OUT, 'web-usb-blanked.png') });
+    await setRange('scene.size', 0.6);
+    await page.waitForSelector('#blank-badge', { state: 'hidden', timeout: 3000 });
+    assert(true, 'size 0.6: beam-safety badge disappears');
+    await sleep(200);
+    assert((await litPixels()) > 200, 'size 0.6: the preview draws the shape again');
 
     await tab('settings');
+    await setRange('settings.scanSize', 0.5);
+    await page.waitForFunction(() => document.getElementById('scan-label').textContent === 'ÁREA DE ESCANEO 50%', null, { timeout: 3000 });
+    assert(true, 'scan-area label follows the scan size (50%)');
+    await page.screenshot({ path: path.join(OUT, 'web-usb-scan50.png') });
+    await setRange('settings.scanSize', 0.8);
+    await page.waitForFunction(() => document.getElementById('scan-label').textContent === 'ÁREA DE ESCANEO 80%', null, { timeout: 3000 });
+
     assert((await page.locator('#rescan span').textContent()) === 'Conectar DAC por USB', 'WebUSB connect button');
     await page.locator('#rescan').tap();
     await page.waitForFunction(() => document.getElementById('dac').textContent !== 'SIMULADOR', null, { timeout: 3000 });

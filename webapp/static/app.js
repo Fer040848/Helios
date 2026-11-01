@@ -1,6 +1,6 @@
 // Helios Web Control - frontend. Vanilla ES module, no dependencies.
 import { connect } from "./net.js";
-import { fitCanvas, drawStrokes } from "./render.js";
+import { fitCanvas, drawStrokes, drawGuides } from "./render.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -319,6 +319,7 @@ function applyState(s) {
   renderCues();
   applyBindings();
   renderDacs();
+  renderScanArea();
   $("#fx-speed").classList.toggle("dim", !!S.scene?.beatSync);
 }
 
@@ -412,22 +413,52 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 
 // ---------- preview ----------
+const BLANK_HOLD_MS = 400; // keep the beam-safety badge up this long after the last blanked frame (no flashing)
 const preview = $("#preview"),
-  pctx = preview.getContext("2d");
+  pctx = preview.getContext("2d"),
+  scanLabel = $("#scan-label"),
+  blankBadge = $("#blank-badge");
 let frameStrokes = [],
-  previewRaf = 0;
+  previewRaf = 0,
+  guides = null, // cached static layer (grid, crosshair, full range, scan area)
+  guidesKey = "",
+  scanSize = null, // as last reported by the server (the real output, not the slider being dragged)
+  blankedAt = -Infinity,
+  blankShown = false;
 function paintPreview() {
   previewRaf = 0;
   fitCanvas(preview);
-  drawStrokes(pctx, frameStrokes);
+  const key = `${preview.width}x${preview.height}@${scanSize}`;
+  if (key !== guidesKey) {
+    guides = drawGuides(guides, preview.width, preview.height, scanSize ?? 1);
+    guidesKey = key;
+  }
+  drawStrokes(pctx, frameStrokes, guides);
 }
 const invalidatePreview = () => {
   if (!previewRaf) previewRaf = requestAnimationFrame(paintPreview);
 };
+function renderScanArea() {
+  const s = S?.settings?.scanSize;
+  if (typeof s !== "number" || s === scanSize) return;
+  scanSize = s;
+  scanLabel.textContent = `ÁREA DE ESCANEO ${Math.round(s * 100)}%`;
+  scanLabel.hidden = false;
+  scanLabel.classList.toggle("outside", s < 0.4); // too small to hold the label: put it under the rectangle
+  $("#preview-wrap").style.setProperty("--scan", s);
+  invalidatePreview();
+}
 function onFrame(msg) {
   frameStrokes = Array.isArray(msg.strokes) ? msg.strokes : [];
   $("#fps").textContent = Math.round(msg.fps || 0);
   $("#pts").textContent = msg.points ?? 0;
+  const now = performance.now();
+  if (msg.blanked) blankedAt = now;
+  const show = now - blankedAt < BLANK_HOLD_MS;
+  if (show !== blankShown) {
+    blankShown = show;
+    blankBadge.hidden = !show;
+  }
   invalidatePreview();
 }
 new ResizeObserver(invalidatePreview).observe(preview);

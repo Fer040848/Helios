@@ -59,11 +59,12 @@ async function until(fn, msg, timeout = 3000) {
     await until(async () => (await page.locator('.cue').count()) === 16, 'cue grid rendered');
     assert((await page.locator('#dac').textContent()) === 'SIMULADOR', 'simulator badge from real server');
     await sleep(600);
+    // lit = brighter than the static preview guides (grid, crosshair, range, scan area) can be: laser light only
     const lit = await page.evaluate(() => {
       const c = document.getElementById('preview');
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
       let n = 0;
-      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++;
       return n;
     });
     assert(lit > 200, `preview draws the live frame (${lit} lit pixels)`);

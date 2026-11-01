@@ -186,10 +186,9 @@ body:not(.offline) #conn-label {
   position: relative;
   width: var(--pv);
   height: var(--pv);
-  border-radius: 14px;
+  border-radius: 8px;
   background: #000;
   border: 1px solid var(--line);
-  box-shadow: inset 0 0 40px rgba(0, 229, 255, 0.05);
   overflow: hidden;
   transition:
     border-color 0.2s,
@@ -214,6 +213,49 @@ body:not(.offline) #conn-label {
   box-shadow: 0 0 12px var(--red);
   display: none;
   animation: blink 1.2s infinite;
+}
+/* Scan-area label: bottom-left corner inside the dashed scan rectangle drawn on the canvas (--scan = scanSize). */
+.scan-label {
+  position: absolute;
+  left: calc((1 - var(--scan, 1)) * 50% + 6px);
+  bottom: calc((1 - var(--scan, 1)) * 50% + 5px);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.scan-label.outside {
+  left: 0;
+  right: 0;
+  bottom: auto;
+  top: calc((1 + var(--scan, 1)) * 50% + 5px);
+  text-align: center;
+}
+/* Beam safety blanked the current frame: nothing is emitted even when armed. */
+.blank-badge {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  padding: 6px 10px;
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  background: rgba(13, 15, 18, 0.88);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-align: center;
+  pointer-events: none;
 }
 body.armed .preview-wrap {
   border: 2px solid var(--red);

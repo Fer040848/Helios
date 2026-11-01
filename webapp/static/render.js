@@ -16,13 +16,72 @@ const PASSES = [
   { w: 1.6, a: 1, white: 0.55 },
 ];
 
+// Static layer under the preview strokes, drawn once into an off-screen canvas and reused for every frame (the
+// caller rebuilds it only when the canvas size or the scan size changes): a faint 8x8 grid, the centre crosshair,
+// the full-range border (the DAC's [-1, 1] limits) and the dashed scan area (settings.scanSize, symmetric, so swap
+// and invert do not move it). Colours stay dim (r+g+b well below 300 per pixel) so only laser light reads as lit.
+export function drawGuides(layer, W, H, scanSize) {
+  const c = layer || document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+  const lw = Math.max(1, Math.round(W / 360)),
+    half = lw / 2;
+  // crisp lines: snap to whole device pixels, centred for the line width
+  const at = (v, size) =>
+    Math.min(size - half, Math.max(half, Math.round(v - half) + half));
+  const line = (x0, y0, x1, y1) => {
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+  };
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = "rgba(139, 147, 161, 0.1)"; // grid
+  ctx.beginPath();
+  for (let i = 1; i < 8; i++) {
+    const x = at((i * W) / 8, W),
+      y = at((i * H) / 8, H);
+    line(x, 0, x, H);
+    line(0, y, W, y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(139, 147, 161, 0.4)"; // centre crosshair
+  const cx = at(W / 2, W),
+    cy = at(H / 2, H),
+    arm = Math.round(Math.min(W, H) * 0.035);
+  ctx.beginPath();
+  line(cx - arm, cy, cx + arm, cy);
+  line(cx, cy - arm, cx, cy + arm);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(139, 147, 161, 0.32)"; // full range
+  ctx.strokeRect(half, half, W - lw, H - lw);
+  const s = Math.min(1, Math.max(0, +scanSize || 0));
+  if (s > 0 && s < 1) {
+    const x0 = at(((1 - s) / 2) * W, W),
+      x1 = at(((1 + s) / 2) * W, W),
+      y0 = at(((1 - s) / 2) * H, H),
+      y1 = at(((1 + s) / 2) * H, H);
+    ctx.strokeStyle = "rgba(230, 232, 235, 0.34)"; // scan area
+    ctx.setLineDash([5 * lw, 4 * lw]);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.setLineDash([]);
+  }
+  return c;
+}
+
+/** Paint strokes over black, the drawing pad's plain grid (guides === true) or a drawGuides() layer. */
 export function drawStrokes(ctx, strokes, guides = false) {
   const { width: W, height: H } = ctx.canvas;
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, W, H);
-  if (guides) {
+  if (guides && guides !== true && guides.width === W && guides.height === H)
+    ctx.drawImage(guides, 0, 0);
+  else {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (guides === true) {
     ctx.strokeStyle = "#141a28";
     ctx.lineWidth = Math.max(1, W / 400);
     ctx.beginPath();

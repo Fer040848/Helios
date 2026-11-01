@@ -62,9 +62,10 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     assert((await page.locator('#dac').textContent()) === 'SIMULADOR', 'SIMULADOR badge');
 
     await sleep(300);
+    // lit = brighter than the static preview guides (grid, crosshair, range, scan area) can be: laser light only
     const lit = await page.evaluate(() => {
       const c = document.getElementById('preview'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-      let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++; return n;
+      let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++; return n;
     });
     assert(lit > 500, `preview has non-black pixels after frame (${lit})`);
     assert(Number(await page.locator('#fps').textContent()) > 0, 'fps shown from frame');
