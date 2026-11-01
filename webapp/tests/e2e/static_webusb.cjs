@@ -202,11 +202,38 @@ const FAKE_USB = () => {
     const avgTick = st.busyMs / st.ticks, perRender = st.busyMs / st.renders;
     console.log(`# thumbnail scheduler, 16 cues: ${st.ticks} ticks in 3 s, ${avgTick.toFixed(2)} ms/tick avg, ` +
       `${st.maxMs.toFixed(1)} ms max, ${(st.renders / st.ticks).toFixed(1)} renders/tick, ${perRender.toFixed(2)} ms/render ` +
-      `(all 16 once: ~${(16 * perRender).toFixed(1)} ms of work, split across ticks by the 4 ms budget)`);
+      `${(st.realMs / st.ticks).toFixed(2)} ms/tick real (with raster and commit), split across ticks by the budget)`);
     assert(avgTick < 6, `one scheduler tick costs under 6 ms on average (${avgTick.toFixed(2)} ms)`);
     assert(st.renders / 3 >= 16 * 4, `16 thumbnails keep animating (${(st.renders / 3 / 16).toFixed(1)} fps each)`);
     assert((await thumbs(perf)).filter((t) => t && t.lit >= 10).length >= 15, '16 cues: the thumbnails draw their figures');
     await perf.screenshot({ path: path.join(OUT, 'web-usb-cues16.png') });
+    await perfCtx.close();
+
+    // Slow device (4x CPU throttle, desktop 1440x900 at 2x, all 16 tiles on screen, disarmed): the thumbnails' share
+    // of the main thread, measured as the busy time with them minus the busy time with thumbs.js blocked, must stay
+    // bounded (the scheduler idles 4x the real cost of each tick: ~20%). Counting only the drawing calls it was ~50%.
+    const busyShare = async (blockThumbs) => {
+      const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+      await c.addInitScript((cues) => localStorage.setItem('helios-web/v1', JSON.stringify({ cues })), cues16);
+      if (blockThumbs) await c.route('**/thumbs.js', (r) => r.abort());
+      const p = await c.newPage();
+      p.on('pageerror', (e) => errors.push(String(e)));
+      await p.goto(server.url);
+      await p.waitForFunction(() => document.querySelectorAll('.cue:not(.empty)').length === 16, null, { timeout: 5000 });
+      const s = await c.newCDPSession(p);
+      await s.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await s.send('Performance.enable');
+      await sleep(1500);
+      const taskTime = async () => (await s.send('Performance.getMetrics')).metrics.find((m) => m.name === 'TaskDuration').value;
+      const [a, t0] = [await taskTime(), Date.now()];
+      await sleep(4000);
+      const share = (await taskTime() - a) / ((Date.now() - t0) / 1000);
+      await c.close();
+      return share;
+    };
+    const [withThumbs, without] = [await busyShare(false), await busyShare(true)];
+    console.log(`# 4x CPU throttle, 16 cues: main thread ${(withThumbs * 100).toFixed(0)}% busy with thumbnails, ${(without * 100).toFixed(0)}% without`);
+    assert(withThumbs - without <= 0.32, `slow device: the thumbnails take at most ~1/3 of the main thread (${((withThumbs - without) * 100).toFixed(0)}%)`);
 
     const noUsb = await (await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })).newPage();
     await noUsb.addInitScript(() => Object.defineProperty(navigator, 'usb', { value: undefined }));
