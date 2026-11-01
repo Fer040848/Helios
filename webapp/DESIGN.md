@@ -217,7 +217,7 @@ The status strip shows connection, DAC/SIMULADOR (a button to Ajustes, where the
 the armed state. The arm / blackout control and
 the live bar sit next to the preview on every layout: 8 quick colours (one tap = that colour on the laser:
 `{type:"scene", scene:{color, colorMode:"solid"}}`; a colour shows as selected only in solid mode, since rainbow /
-cycle / beat ignore the base colour), TAP → `{type:"tap"}` with the BPM, and a chip with the current effect that opens
+cycle / beat ignore the base colour; it follows the Color tab, grace period included), TAP → `{type:"tap"}` with the BPM, and a chip with the current effect that opens
 the Efecto tab. They use the same messages as the panels, so they work in both transports. Armed labels are white on
 `--live-fill` (#d92d20, 4.8:1); `--live` (#ff3b30) is for borders, glow and dots. Nothing animates a property the
 compositor cannot run (no box-shadow pulses): in WebUSB mode the output loop shares the main thread. Touch targets

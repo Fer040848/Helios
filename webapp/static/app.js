@@ -596,8 +596,11 @@ async function cueTap(i) {
       send({ type: "saveCue", index: i, name });
       setSaveMode(false);
     }
-  } else if (c) send({ type: "cue", index: i });
-  else toast("Ranura vacía · usa «Guardar» para almacenar la escena");
+  } else if (c) {
+    // the cue replaces the colour: its state shows at once, also right after a colour tap (no grace period)
+    for (const k of ["scene.color", "scene.colorMode"]) if (busy.get(k) !== Infinity) busy.delete(k);
+    send({ type: "cue", index: i });
+  } else toast("Ranura vacía · usa «Guardar» para almacenar la escena");
 }
 async function cueActions(i) {
   const c = S?.cues?.[i];
@@ -794,8 +797,9 @@ function showQuickColor(color, mode) {
   });
 }
 function renderLiveBar() {
-  // from the state (not a binding with a grace period): a cue fired right after a tap must clear the mark at once
-  showQuickColor(S?.scene?.color, S?.scene?.colorMode);
+  // as the Color tab shows it (bindings with a grace period): a state already on its way when a quick colour is tapped
+  // must not clear its mark while the Color tab still says solid; a cue ends that grace period (cueTap)
+  showQuickColor(colorInput.value, $("#color-modes .on")?.dataset.value);
   // straight from the state, not a binding: the readouts follow the real tempo even while the BPM slider is held
   const bpm = String(Math.round((S?.bpm ?? 120) * 10) / 10);
   setText($("#strip-bpm"), bpm);
