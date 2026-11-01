@@ -47,18 +47,18 @@
       <span class="arm-label" id="arm-label">MANTÉN PARA EMITIR</span>
     </button>
     <p class="kbd-hint"><kbd>Esc</kbd> o <kbd>Espacio</kbd> apagan la emisión al instante</p>
-    <!-- Live bar: one-tap colour, tempo and effect access, always next to the arm control -->
-    <div class="livebar" id="livebar" role="group" aria-label="Barra rápida en vivo">
-      <div class="quick-colors" id="quick-colors" role="radiogroup" aria-label="Color rápido">
-        <button type="button" role="radio" data-color="#ff0000" style="--sw:#ff0000" aria-label="Rojo"></button>
-        <button type="button" role="radio" data-color="#ff8000" style="--sw:#ff8000" aria-label="Naranja"></button>
-        <button type="button" role="radio" data-color="#ffff00" style="--sw:#ffff00" aria-label="Amarillo"></button>
-        <button type="button" role="radio" data-color="#00ff00" style="--sw:#00ff00" aria-label="Verde"></button>
-        <button type="button" role="radio" data-color="#00ffff" style="--sw:#00ffff" aria-label="Cian"></button>
-        <button type="button" role="radio" data-color="#0000ff" style="--sw:#2a4bff" aria-label="Azul"></button>
-        <button type="button" role="radio" data-color="#ff00ff" style="--sw:#ff00ff" aria-label="Magenta"></button>
-        <button type="button" role="radio" data-color="#ffffff" style="--sw:#ffffff" aria-label="Blanco"></button>
-      </div>
+    <!-- Live bar: one-tap colour (solid), tempo and effect access, always next to the arm control -->
+    <div class="quick-colors" id="quick-colors" role="radiogroup" aria-label="Color rápido (sólido)">
+      <button type="button" role="radio" data-color="#ff0000" style="--sw:#ff0000" aria-label="Rojo"></button>
+      <button type="button" role="radio" data-color="#ff8000" style="--sw:#ff8000" aria-label="Naranja"></button>
+      <button type="button" role="radio" data-color="#ffff00" style="--sw:#ffff00" aria-label="Amarillo"></button>
+      <button type="button" role="radio" data-color="#00ff00" style="--sw:#00ff00" aria-label="Verde"></button>
+      <button type="button" role="radio" data-color="#00ffff" style="--sw:#00ffff" aria-label="Cian"></button>
+      <button type="button" role="radio" data-color="#0000ff" style="--sw:#2a4bff" aria-label="Azul"></button>
+      <button type="button" role="radio" data-color="#ff00ff" style="--sw:#ff00ff" aria-label="Magenta"></button>
+      <button type="button" role="radio" data-color="#ffffff" style="--sw:#ffffff" aria-label="Blanco"></button>
+    </div>
+    <div class="livebar" id="livebar" role="group" aria-label="Tempo y efecto">
       <button type="button" class="live-tap" id="live-tap" aria-label="Marcar tempo (TAP)"><span class="lt-key">TAP</span><span class="lt-read"><b id="live-bpm">120</b>&thinsp;BPM</span></button>
       <button type="button" class="fx-chip" id="fx-chip" aria-label="Efecto: Ninguno. Abrir el panel de efectos">
         <span class="fx-text"><span class="fx-key">Efecto</span><span class="fx-name" id="fx-name">Ninguno</span></span>
@@ -175,13 +175,15 @@
 
       <!-- Dibujo -->
       <section class="page" id="page-draw" role="tabpanel" aria-labelledby="tab-draw" data-page="draw" hidden>
-        <h3>Dibujo <span class="h-note" id="draw-count">0 / 2000 puntos</span></h3>
+        <div class="draw-head">
+          <h3>Dibujo <span class="h-note" id="draw-count">0 / 2000 puntos</span></h3>
+          <div class="draw-tools">
+            <button type="button" class="btn compact" id="draw-undo" aria-label="Deshacer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="btn-label">Deshacer</span></button>
+            <button type="button" class="btn compact danger" id="draw-clear" aria-label="Borrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg><span class="btn-label">Borrar</span></button>
+          </div>
+        </div>
         <div class="draw-wrap">
           <canvas id="draw" class="draw-canvas" aria-label="Lienzo de dibujo: dibuja con el dedo"></canvas>
-        </div>
-        <div class="btn-row">
-          <button type="button" class="btn" id="draw-undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Deshacer</button>
-          <button type="button" class="btn danger" id="draw-clear"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Borrar</button>
         </div>
       </section>
 

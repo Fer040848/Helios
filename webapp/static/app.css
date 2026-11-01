@@ -21,6 +21,8 @@
   --live: #ff3b30;
   --live-soft: rgba(255, 59, 48, 0.14);
   --live-line: rgba(255, 59, 48, 0.5);
+  --live-fill: #d92d20; /* fill under white labels (4.8:1); --live stays for borders, glow and dots */
+  --live-fill-hover: #c0271d; /* 5.9:1 */
   --ok: #34c759;
   --warn: #ffb020;
   --warn-soft: rgba(255, 176, 32, 0.1);
@@ -49,13 +51,15 @@
   --sar: env(safe-area-inset-right, 0px);
   /* the visible height (dynamic viewport where supported: mobile browser bars) */
   --vh100: 100vh;
-  /* phone portrait: the fixed rows (strip, stage chrome: arm + live bar, tab bar) take ~276 px; the preview and the
-     panel share the rest, the panel keeping at least ~280 px so the drawing pad and sliders stay usable */
+  /* Phone portrait, tall screens (> 760 px). Fixed rows (--chrome-v): strip 41 + stage 186 (padding 16, arm 52,
+     colours 50, TAP / effect row 44, three 8 px gaps) + tab bar 55 = 282 px. The panel keeps 280 px and the preview
+     takes the rest (at least 200 px). Shorter screens use the layout of the max-height: 760px block below. */
+  --chrome-v: 282px;
   --pv: min(
     calc(100vw - 24px - var(--sal) - var(--sar)),
-    max(calc(var(--vh100) * 0.3), calc(var(--vh100) - 556px - var(--sat) - var(--sab)))
+    max(200px, calc(var(--vh100) - var(--chrome-v) - 280px - var(--sat) - var(--sab)))
   );
-  --panel-h: calc(var(--vh100) - var(--pv) - 276px - var(--sat) - var(--sab));
+  --panel-h: calc(var(--vh100) - var(--pv) - var(--chrome-v) - var(--sat) - var(--sab));
   color-scheme: dark;
 }
 @supports (height: 100dvh) {
@@ -231,7 +235,7 @@ body:not(.offline) #conn-label {
 }
 .arm-state.live {
   border-color: var(--live);
-  background: var(--live);
+  background: var(--live-fill);
   color: #fff;
   box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
 }
@@ -287,25 +291,40 @@ body.offline .arm-state {
   top: var(--s2);
   left: var(--s2);
   display: none;
+  align-items: center;
+  gap: 5px;
   padding: 3px 7px;
+  border: 1px solid var(--live);
   border-radius: var(--r-sm);
-  background: var(--live);
+  background: var(--live-fill);
   color: #fff;
   font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.1em;
-  box-shadow: 0 0 12px var(--live);
-  animation: blink 1.2s infinite;
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.6);
 }
-/* Scan-area label: bottom-left corner inside the dashed scan rectangle drawn on the canvas (--scan = scanSize). */
+/* the label stays steady (readable); only its dot blinks, with opacity, which the compositor animates */
+.live-tag::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: dot 1.2s infinite;
+}
+/* Scan-area label: bottom-left corner inside the dashed scan rectangle drawn on the canvas (--scan = scanSize).
+   app.js shortens it on small previews; the max-width keeps it inside the preview in any case. */
 .scan-label {
   position: absolute;
   left: calc((1 - var(--scan, 1)) * 50% + 6px);
   bottom: calc((1 - var(--scan, 1)) * 50% + 5px);
+  max-width: calc((1 + var(--scan, 1)) * 50% - 8px);
+  overflow: hidden;
   color: var(--muted);
   font: 600 10px/1 var(--font);
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -314,6 +333,7 @@ body.offline .arm-state {
   right: 0;
   bottom: auto;
   top: calc((1 + var(--scan, 1)) * 50% + 5px);
+  max-width: none;
   text-align: center;
 }
 /* Beam safety blanked the current frame: nothing is emitted even when armed. */
@@ -338,6 +358,11 @@ body.offline .arm-state {
   text-align: center;
   pointer-events: none;
 }
+.preview-wrap.compact .blank-badge {
+  padding: 5px 8px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
 body.armed .preview-wrap {
   border-color: var(--live);
   box-shadow:
@@ -345,18 +370,25 @@ body.armed .preview-wrap {
     0 0 22px rgba(255, 59, 48, 0.45);
 }
 body.armed .live-tag {
-  display: block;
+  display: flex;
 }
 @keyframes blink {
   50% {
     opacity: 0.55;
   }
 }
+@keyframes dot {
+  50% {
+    opacity: 0.2;
+  }
+}
 
-/* arm / blackout: the one control that is always on screen */
+/* arm / blackout: the one control that is always on screen. Phones: the arm, the quick colours and the live bar
+   span the stage (the width of the panel content below); the square preview is centred above them. */
 .arm,
+.quick-colors,
 .livebar {
-  width: max(var(--pv), 300px);
+  width: 100%;
   max-width: 100%;
 }
 .arm {
@@ -402,12 +434,13 @@ body.armed .live-tag {
 .arm.pending {
   border-color: var(--live);
 }
+/* Armed: a deep red fill under the white label (contrast) and a steady glow. No animation here: a box-shadow
+   animation repaints on the main thread every frame, which the WebUSB output loop shares. */
 body.armed .arm {
-  border-color: #ff6d64;
-  background: var(--live);
+  border-color: var(--live);
+  background: var(--live-fill);
   color: #fff;
   box-shadow: 0 0 24px rgba(255, 59, 48, 0.6);
-  animation: live 1.4s infinite;
 }
 body.armed .arm-icon svg {
   color: #fff;
@@ -415,17 +448,11 @@ body.armed .arm-icon svg {
 body.armed .arm-fill {
   display: none;
 }
-@keyframes live {
-  50% {
-    box-shadow: 0 0 10px rgba(255, 59, 48, 0.35);
-  }
-}
 body.offline .arm {
   border-color: var(--border);
   background: var(--panel);
-  color: var(--faint);
+  color: var(--muted);
   box-shadow: none;
-  animation: none;
   pointer-events: none;
 }
 body.offline .arm-icon svg {
@@ -441,17 +468,16 @@ body.offline .arm-icon svg {
   text-align: center;
 }
 
-/* live bar: quick colours / TAP + BPM / effect chip */
+/* live bar: quick colours (one row of 8; the buttons touch, the swatch inset is the visual gap, so each target is
+   as wide as the row allows), then TAP + BPM and the effect chip */
 .livebar {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
   gap: var(--s2);
 }
 .quick-colors {
-  flex: 1 1 100%;
+  flex: none;
   display: flex;
-  gap: 2px;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -468,7 +494,7 @@ body.offline .arm-icon svg {
 }
 .quick-colors button {
   flex: 1 1 0;
-  height: 40px;
+  height: var(--hit);
 }
 .quick-colors button::before,
 .swatches button::before {
@@ -639,8 +665,8 @@ body.offline .arm-icon svg {
     box-shadow: inset 0 0 0 2px var(--border-strong);
   }
   body.armed .arm:hover {
-    border-color: #ff8a83;
-    background: #ff4d43;
+    border-color: var(--live);
+    background: var(--live-fill-hover); /* darker, never lighter: the label keeps its contrast */
   }
 }
 
@@ -757,20 +783,22 @@ h2 {
 .cue.empty {
   border-style: dashed;
   background: transparent;
-  color: #6c7380;
+  color: var(--muted);
 }
 .cue.empty .art {
   visibility: hidden;
   border-bottom-color: transparent;
 }
 .cue.empty .num {
-  color: #6c7380;
+  color: var(--muted);
 }
 .cue.empty .name {
   font-weight: 400;
 }
-/* selection / focus ring drawn over the thumbnail, so it does not resize the canvas */
-.cue::after {
+/* selection / focus ring drawn over the thumbnail, so it does not resize the canvas (only on the tiles that show
+   one: an overlay on every tile would add a layer above each thumbnail canvas) */
+.cue.active::after,
+.cue:focus-visible::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -864,12 +892,13 @@ h2 {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 0 var(--s4) var(--s5);
+  padding: 0 var(--s3) var(--s5);
   border-top: 1px solid var(--border);
   background: var(--panel);
 }
 body.offline .panel,
 body.offline .cues-pane,
+body.offline .quick-colors,
 body.offline .livebar {
   opacity: 0.4;
   pointer-events: none;
@@ -895,7 +924,7 @@ h3 {
   margin-top: var(--s4);
 }
 .h-note {
-  color: var(--faint);
+  color: var(--muted);
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -955,7 +984,7 @@ h3 {
 .seg button {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 40px;
+  min-height: var(--hit);
   padding: 0 var(--s1);
   border: 0;
   border-radius: var(--r);
@@ -1078,7 +1107,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 }
 @media (pointer: coarse) {
   input[type="range"] {
-    height: 40px;
+    height: var(--hit);
   }
   input[type="range"]::-webkit-slider-thumb {
     width: 24px;
@@ -1339,15 +1368,34 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* drawing */
+/* drawing: Deshacer / Borrar beside the heading (never below the fold: the pad blocks scroll gestures), the pad
+   below fits the visible panel: 1 px border + 16 px margin + 44 px head + 12 px gap + slack = 80 px */
+.draw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: var(--s4) 0 var(--s3);
+}
+.draw-head h3 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+.draw-tools {
+  flex: none;
+  display: flex;
+  gap: var(--s2);
+}
 .draw-wrap {
   display: flex;
   justify-content: center;
 }
 .draw-canvas {
   display: block;
-  /* fits the visible panel height (with the undo/clear row just below), so a stroke never runs under the tab bar */
-  width: min(100%, 340px, max(180px, calc(var(--panel-h) - 64px)));
+  width: min(100%, 340px, max(150px, calc(var(--panel-h) - 80px)));
   aspect-ratio: 1;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -1528,21 +1576,69 @@ kbd {
     display: none; /* the mark stays, labelled "Helios Web Control" */
   }
 }
+@media (max-width: 359px) {
+  .draw-tools .btn-label {
+    display: none; /* icon buttons, named by their aria-label */
+  }
+}
 @media (max-width: 330px) {
   .stat-bpm {
     display: none; /* the live bar shows the tempo */
   }
 }
 
+/* ---------- phone portrait, short screens (browser bars, small phones) ----------
+   TAP and the effect chip move beside the preview (the room a height-limited square leaves), the colours stay in
+   one row under the arm. Fixed rows (--chrome-v): strip 41 + stage 134 (padding 16, arm 52, colours 50, two 8 px
+   gaps) + tab bar 55 = 230 px. The panel keeps 280 px on screens from ~650 px tall; below that the preview stops at
+   a quarter of the height (130 px at least) and the panel gets the rest (about 200 px on a 360x560 screen).
+   The query is the phone-portrait layout region (neither the phone-landscape nor the tablet query) up to 760 px. */
+@media (max-width: 519px) and (max-height: 760px), (max-width: 599px) and (min-height: 520px) and (max-height: 760px) {
+  :root {
+    --chrome-v: 230px;
+    --pv: min(
+      calc(100vw - 24px - 128px - var(--sal) - var(--sar)),
+      max(
+        130px,
+        calc(var(--vh100) * 0.25 - 10px),
+        calc(var(--vh100) - var(--chrome-v) - 280px - var(--sat) - var(--sab))
+      )
+    );
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: var(--pv) minmax(0, 1fr);
+    grid-template-areas: "pv live" "arm arm" "qc qc";
+    align-items: stretch;
+  }
+  .preview-wrap {
+    grid-area: pv;
+  }
+  .arm {
+    grid-area: arm;
+  }
+  .quick-colors {
+    grid-area: qc;
+  }
+  .livebar {
+    grid-area: live;
+    flex-direction: column;
+  }
+  .live-tap,
+  .fx-chip {
+    flex: 1 1 0;
+  }
+}
+
 /* ---------- phone landscape: preview + arm + live bar on the left, panels on the right ---------- */
 @media (orientation: landscape) and (max-height: 519px) and (min-width: 520px) {
   :root {
-    --side: 172px;
+    --side: 184px; /* 4 colours per row, 44 px each */
     --pv: max(
       140px,
       min(
         calc(var(--vh100) - 56px - var(--sat) - var(--sab)),
-        calc(100vw - 360px - var(--side) - 32px - var(--sal) - var(--sar))
+        calc(100vw - 340px - var(--side) - 32px - var(--sal) - var(--sar))
       )
     );
     --panel-h: calc(var(--vh100) - var(--strip-h) - 47px - var(--sat) - var(--sab));
@@ -1555,13 +1651,18 @@ kbd {
   .stage {
     display: grid;
     grid-template-columns: var(--pv) var(--side);
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas: "pv arm" "pv live";
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "pv arm" "pv qc" "pv live";
     align-content: start;
     align-items: start;
     gap: var(--s2);
     padding: var(--s2) var(--s3) calc(var(--s2) + var(--sab));
     border-right: 1px solid var(--border);
+  }
+  /* the offline banner covers the preview only, never the arm beside it */
+  .banner {
+    right: auto;
+    width: var(--pv);
   }
   .preview-wrap {
     grid-area: pv;
@@ -1574,21 +1675,16 @@ kbd {
     font-size: 12px;
     letter-spacing: 0.06em;
   }
-  .livebar {
-    grid-area: live;
-    width: auto;
-    align-content: flex-start;
-  }
   .quick-colors {
+    grid-area: qc;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: auto;
   }
-  .quick-colors button {
-    height: 38px;
-  }
-  .live-tap,
-  .fx-chip {
-    flex: 1 1 100%;
+  .livebar {
+    grid-area: live;
+    flex-direction: column;
+    width: auto;
   }
   .cues-pane,
   .panel {
@@ -1607,6 +1703,26 @@ kbd {
     left: calc((var(--pv) + var(--side) + 32px + var(--sal) + 100vw - var(--sar)) / 2);
     bottom: calc(var(--sab) + 58px);
     max-width: calc(100vw - var(--pv) - var(--side) - 64px - var(--sal) - var(--sar));
+  }
+}
+/* small phones in landscape (iPhone SE / 8 at 667x375): the preview is width-limited, so TAP and the effect chip go
+   under it and the side column narrows to the arm and two colours per row, which lets the preview grow */
+@media (orientation: landscape) and (max-height: 519px) and (min-width: 520px) and (max-width: 740px) {
+  :root {
+    --side: 150px;
+    --pv: max(
+      120px,
+      min(
+        calc(var(--vh100) - 56px - 104px - var(--sat) - var(--sab)),
+        calc(100vw - 300px - var(--side) - 32px - var(--sal) - var(--sar))
+      )
+    );
+  }
+  .stage {
+    grid-template-areas: "pv arm" "pv qc" "live qc";
+  }
+  .quick-colors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1635,6 +1751,11 @@ kbd {
   }
   .stage {
     padding: var(--s4) var(--s4) var(--s3);
+  }
+  .arm,
+  .quick-colors,
+  .livebar {
+    width: max(var(--pv), 360px); /* at least 44 px per quick colour */
   }
   .arm {
     min-height: 56px;
@@ -1709,7 +1830,7 @@ kbd {
   :root {
     --colL: clamp(340px, 32vw, 520px);
     --colR: clamp(360px, 30vw, 460px);
-    --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 264px)));
+    --pv: min(calc(var(--colL) - 32px), max(220px, calc(var(--vh100) - 272px)));
   }
   #app {
     grid-template-columns: var(--colL) minmax(0, 1fr) var(--colR);
@@ -1721,6 +1842,7 @@ kbd {
     border-right: 1px solid var(--border);
   }
   .arm,
+  .quick-colors,
   .livebar {
     width: var(--pv);
   }

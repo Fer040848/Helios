@@ -23,8 +23,9 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
 
     const state = makeState();
     const sent = [];
-    let sock = null, connections = 0, blanked = false;
+    let sock = null, connections = 0, blanked = false, refuse = false;
     const wire = (p) => p.routeWebSocket('**/ws', (ws) => {
+      if (refuse) { ws.close(); return; } // a server that is down: the UI stays offline and keeps retrying
       sock = ws; connections++;
       const push = () => ws.send(JSON.stringify({ type: 'state', state }));
       push();
@@ -64,6 +65,30 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     const onScreen = (b) => !!b && b.w > 0 && b.h > 0 && b.x >= 0 && b.y >= 0 && b.r <= b.vw + 0.5 && b.b <= b.vh + 0.5;
     // the arm / blackout control must be fully visible on every layout
     const armOnScreen = async (p, what) => assert(onScreen(await box(p, '#arm')), `${what}: arm / blackout control fully on screen`);
+    const overlap = (a, b) => !!a && !!b && a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
+    // WCAG contrast of an element's text against the first opaque background behind it
+    const contrast = (p, sel) => p.evaluate((s) => {
+      const el = document.querySelector(s);
+      const rgb = (c) => c.match(/[\d.]+/g).map(Number);
+      const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+        .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+      let bg = [0, 0, 0];
+      for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length < 4 || c[3] > 0) { bg = c; break; } }
+      const [hi, lo] = [lum(rgb(getComputedStyle(el).color)), lum(bg)].sort((a, b) => b - a);
+      return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
+    }, sel);
+    const aa = async (p, sel, what) => { const c = await contrast(p, sel); assert(c >= 4.5, `${what}: text contrast ${c}:1 >= 4.5:1 (WCAG AA)`); };
+    // Running CSS animations (not the one-shot 0.2 s transitions) of properties the compositor cannot animate: each one
+    // costs a main-thread frame per vsync, and in WebUSB mode the output loop shares that thread. opacity and transform
+    // are fine.
+    const mainThreadAnimations = (p) => p.evaluate(() => document.getAnimations()
+      .filter((a) => !(typeof CSSTransition === 'function' && a instanceof CSSTransition))
+      .flatMap((a) => (a.effect?.getKeyframes?.() || []).flatMap((k) => Object.keys(k)))
+      .filter((k) => !['offset', 'computedOffset', 'easing', 'composite', 'opacity', 'transform'].includes(k)));
+    const litPreview = (p) => p.evaluate(() => {
+      const c = document.getElementById('preview'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++; return n;
+    });
 
     await page.goto(server.url);
     await page.waitForFunction(() => !document.body.classList.contains('offline'));
@@ -86,11 +111,22 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     assert(await page.locator('#livebar').isVisible() && await page.locator('#tab-cues').isVisible(), 'phone portrait: live bar shown, Cues is a tab');
     await page.screenshot({ path: path.join(OUT, 'redesign-phone-portrait.png') });
 
-    // Live bar: a quick colour sends exactly a colour scene message and shows as selected once the state echoes it.
+    // Live bar: one tap on a quick colour = that colour on the laser: a single scene message with the colour and the solid
+    // colour mode; it shows as selected once the state echoes it.
     await page.locator('#quick-colors [data-color="#ff0000"]').tap();
-    await waitMsg((m) => m.type === 'scene' && JSON.stringify(m.scene) === '{"color":"#ff0000"}', 'live bar swatch sends {type:scene, scene:{color:"#ff0000"}}');
+    await waitMsg((m) => m.type === 'scene' && JSON.stringify(m.scene) === '{"color":"#ff0000","colorMode":"solid"}', 'live bar swatch sends {type:scene, scene:{color:"#ff0000", colorMode:"solid"}}');
     await page.waitForSelector('#quick-colors [data-color="#ff0000"].on[aria-checked="true"]');
     assert(await page.locator('#quick-colors .on').count() === 1, 'live bar shows the current colour');
+    // Non-solid colour mode (cue 2 "Túnel arcoíris" is rainbow): the base colour is not what the laser shows, so no quick
+    // colour is marked; a tap switches back to solid in that colour.
+    await page.locator('.cue[data-index="1"]').tap();
+    await waitMsg((m) => m.type === 'cue' && m.index === 1, 'tapping cue 2 (rainbow) sends {type:cue,index:1}');
+    await page.waitForFunction(() => document.querySelectorAll('#quick-colors .on, #quick-colors [aria-checked="true"]').length === 0);
+    assert(true, 'rainbow mode: no quick colour shows as selected');
+    await page.locator('#quick-colors [data-color="#00ffff"]').tap();
+    await waitMsg((m) => m.type === 'scene' && m.scene.color === '#00ffff' && m.scene.colorMode === 'solid', 'rainbow mode: a quick colour sends the colour with colorMode solid');
+    await page.waitForFunction(() => document.querySelector('#quick-colors [data-color="#00ffff"]').classList.contains('on'));
+    assert(state.scene.colorMode === 'solid' && state.scene.color === '#00ffff', 'rainbow mode: after the tap the scene is solid cyan');
     // TAP sends a tap; the BPM readouts follow the state.
     await page.locator('#live-tap').tap();
     await waitMsg((m) => m.type === 'tap', 'live bar TAP sends {type:tap}');
@@ -122,6 +158,13 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     await page.screenshot({ path: path.join(OUT, 'armed.png') });
     await page.screenshot({ path: path.join(OUT, 'redesign-armed.png') });
     assert((await page.locator('#arm-state').textContent()) === 'EN VIVO', 'status strip shows the armed state');
+    await aa(page, '#arm-label', 'armed: arm label "EN VIVO — TOCA PARA APAGAR"');
+    await aa(page, '#arm-state', 'armed: status strip chip "EN VIVO"');
+    await aa(page, '.live-tag', 'armed: preview tag "EN VIVO"');
+    {
+      const anim = await mainThreadAnimations(page);
+      assert(anim.length === 0, `armed: no running animation of a non-compositable property (${anim.join(', ') || 'none'})`);
+    }
     await touch('touchStart', ax, ay); await touch('touchEnd');
     await waitMsg((m) => m.type === 'blackout', 'tap while armed sends blackout');
     await page.waitForSelector('body:not(.armed)');
@@ -176,6 +219,38 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     await page.locator('label:has(#invert-x)').tap();
     await waitMsg((m) => m.type === 'settings' && m.settings.invertX === true, 'toggling invertX sends settings');
 
+    // Phone portrait sizes (in-browser viewports with toolbars included): the arm, the quick colours and the live bar
+    // span the stage; colour and segmented targets are 44 px tall; the panel keeps its room; Deshacer / Borrar and the
+    // drawing pad stay above the tab bar.
+    for (const [w, h, minPanel, padFits] of [[390, 844, 278, 1], [390, 664, 270, 1], [360, 640, 255, 1], [320, 568, 200, 0]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await tab('cues');
+      await sleep(250);
+      const vp = `${w}x${h}`;
+      await armOnScreen(page, vp);
+      const [arm, qc, tap, fx, panel, tabs] = await Promise.all(['#arm', '#quick-colors', '#live-tap', '#fx-chip', '#page-cues', '.tabbar'].map((s) => box(page, s)));
+      assert(Math.abs(arm.w - (w - 24)) < 1 && Math.abs(qc.w - arm.w) < 1 && Math.abs(qc.x - arm.x) < 1, `${vp}: arm and quick colours span the stage (${arm.w} px)`);
+      assert(onScreen(tap) && onScreen(fx) && tap.h >= 44 && fx.h >= 44, `${vp}: TAP and the effect chip on screen, >= 44 px tall`);
+      const sw = await page.evaluate(() => [...document.querySelectorAll('#quick-colors button')].map((b) => b.getBoundingClientRect()));
+      const minW = Math.min(...sw.map((r) => r.width)), minH = Math.min(...sw.map((r) => r.height));
+      assert(minH >= 44 && (w < 360 || minW >= 40), `${vp}: quick colours ${minW.toFixed(1)}x${minH.toFixed(1)} px (44 px tall${w < 360 ? '' : ', >= 40 px wide'})`);
+      assert(panel.h >= minPanel && Math.abs(panel.b - tabs.y) < 1.5, `${vp}: the panel keeps ${Math.round(panel.h)} px (>= ${minPanel}) above the tab bar`);
+      const scan = await page.evaluate(() => { const l = document.getElementById('scan-label'); return { text: l.textContent, whole: l.scrollWidth <= l.clientWidth,
+        inside: l.getBoundingClientRect().right <= document.getElementById('preview-wrap').getBoundingClientRect().right }; });
+      assert(scan.whole && scan.inside, `${vp}: scan label "${scan.text}" shown whole inside the preview`);
+      if (w === 360) await page.screenshot({ path: path.join(OUT, 'redesign-phone-short.png') });
+      await tab('shape');
+      const seg = await page.evaluate(() => Math.min(...[...document.querySelectorAll('#page-shape .seg button')].map((b) => b.getBoundingClientRect().height)));
+      assert(seg >= 44, `${vp}: segmented buttons are ${seg} px tall (>= 44)`);
+      await tab('draw');
+      const [undo, clear, pad, tb] = await Promise.all(['#draw-undo', '#draw-clear', '#draw', '.tabbar'].map((s) => box(page, s)));
+      assert(undo.b <= tb.y && clear.b <= tb.y && undo.h >= 44, `${vp}: Deshacer / Borrar fully above the tab bar`);
+      if (padFits) assert(pad.b <= tb.y + 0.5, `${vp}: the drawing pad (${Math.round(pad.w)} px) fits above the tab bar`);
+      if (w === 360) await page.screenshot({ path: path.join(OUT, 'redesign-phone-short-draw.png') });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await tab('settings');
+
     // Server error -> toast.
     sock.send(JSON.stringify({ type: 'error', message: 'Mensaje no válido' }));
     await page.waitForSelector('#toast:not([hidden]):has-text("Mensaje no válido")');
@@ -198,6 +273,43 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       const [pv, live, grid] = [await box(page, '.preview-wrap'), await box(page, '#livebar'), await box(page, '#cue-grid')];
       assert(onScreen(live) && pv.r <= grid.x && await page.locator('#tab-cues').isVisible(), 'phone landscape: preview, arm and live bar left of the panels; Cues still a tab');
     }
+    // Small phone in landscape (667x375): TAP / effect under the preview so the preview can grow; the scan label fits.
+    await page.setViewportSize({ width: 667, height: 375 });
+    await sleep(300);
+    await page.screenshot({ path: path.join(OUT, 'redesign-landscape-small.png') });
+    await armOnScreen(page, '667x375');
+    {
+      const [pv, live, qc, label] = await Promise.all(['.preview-wrap', '#livebar', '#quick-colors', '#scan-label'].map((s) => box(page, s)));
+      assert(pv.w >= 180 && onScreen(live) && onScreen(qc) && live.y >= pv.b, `667x375: preview ${pv.w} px (>= 180), TAP / effect under it`);
+      const clipped = await page.evaluate(() => { const l = document.getElementById('scan-label'); return l.scrollWidth > l.clientWidth; });
+      assert(label.r <= pv.r && !clipped, `667x375: scan label "${await page.locator('#scan-label').textContent()}" fits in the preview`);
+    }
+
+    // Connection lost right after beam safety blanked frames (the badge is still held up) and the server does not come
+    // back: the badge and the last frame go (the UI no longer knows what is emitted); the banner never covers the arm.
+    blanked = true;
+    await page.waitForSelector('#blank-badge', { state: 'visible' });
+    blanked = false;
+    await sleep(150); // lit frames again; the badge stays up for its hold time
+    assert(await page.locator('#blank-badge').isVisible() && await litPreview(page) > 500, 'before the drop: badge held up, laser light in the preview');
+    refuse = true;
+    sock.close();
+    await page.waitForSelector('body.offline');
+    await sleep(800);
+    assert(await page.locator('#blank-badge').isHidden(), 'offline: the beam-safety badge is cleared');
+    const litOff = await litPreview(page);
+    assert(litOff < 20, `offline: the preview no longer shows the last frame (${litOff} lit pixels)`);
+    for (const [w, h] of [[844, 390], [667, 375], [390, 844], [360, 640]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await sleep(250);
+      const [banner, arm] = [await box(page, '#banner'), await box(page, '#arm')];
+      assert(banner && onScreen(arm) && !overlap(banner, arm), `${w}x${h} offline: the banner does not cover the arm`);
+      if (w === 844) await page.screenshot({ path: path.join(OUT, 'redesign-offline-landscape.png') });
+    }
+    refuse = false;
+    blanked = false;
+    await page.waitForFunction(() => !document.body.classList.contains('offline'), null, { timeout: 10000 });
+    assert(true, 'reconnects once the server answers again');
 
     // Tablet (820x1180, touch): two columns - preview, arm, live bar and cues left; tabbed controls right.
     await page.setViewportSize({ width: 820, height: 1180 });
@@ -230,6 +342,9 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       assert(await dp.locator('.cue').count() === 16 && (await box(dp, '.cue[data-index="15"]')).b <= 900, 'desktop: all 16 cues on screen (4x4)');
       await armOnScreen(dp, 'desktop');
     }
+    await aa(dp, '#page-shape .h-note', 'desktop: hint note "doble toque para centrar"');
+    await aa(dp, '.cue.empty .name', 'desktop: empty cue label "Vacío"');
+    await aa(dp, '.cue.empty .num', 'desktop: empty cue number');
     await dp.locator('.cue[data-index="2"]').click();
     await waitMsg((m) => m.type === 'cue' && m.index === 2, 'desktop: clicking a cue fires it');
     await dp.locator('[data-tab="fx"]').click();
@@ -237,6 +352,22 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     await dp.locator('[data-tab="shape"]').click();
     await sleep(300);
     await dp.screenshot({ path: path.join(OUT, 'redesign-desktop.png') });
+    // Armed on desktop (mouse hold): the labels keep their contrast, also under the pointer (hover), and nothing animates
+    // on the main thread.
+    {
+      const a = await dp.locator('#arm').boundingBox();
+      await dp.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+      await dp.mouse.down(); await sleep(750); await dp.mouse.up();
+      await dp.waitForSelector('body.armed');
+      await aa(dp, '#arm-label', 'desktop armed, pointer over the arm (hover)');
+      await dp.mouse.move(5, 300);
+      await aa(dp, '#arm-label', 'desktop armed: arm label');
+      await aa(dp, '#arm-state', 'desktop armed: status strip chip');
+      await aa(dp, '.live-tag', 'desktop armed: preview tag');
+      const anim = await mainThreadAnimations(dp);
+      assert(anim.length === 0, `desktop armed: no running animation of a non-compositable property (${anim.join(', ') || 'none'})`);
+      await dp.screenshot({ path: path.join(OUT, 'redesign-desktop-armed.png') });
+    }
     // keyboard safety still works with this layout: Space / Esc send blackout
     const before = sent.filter((m) => m.type === 'blackout').length;
     await dp.keyboard.press('Escape');

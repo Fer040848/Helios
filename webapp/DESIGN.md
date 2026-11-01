@@ -200,8 +200,12 @@ background all black out. Only USB DACs (browsers cannot speak IDN/UDP).
 `static/thumbs.js` draws a live mini preview of every filled cue in its tile, in the browser, with the pure JS engine
 (`mergeScene(SCENE_DEFAULTS, cue.scene)` → `compose(scene, clocks)`, one `Clocks` per cue, the state's BPM), in both
 transports. No output transform: it shows the figure, not the scan area. Because the WebUSB output loop shares the
-main thread, one rAF scheduler draws each thumbnail at ~8 fps within a ~4 ms budget per tick (at least one thumbnail,
-round-robin), only for tiles on screen (IntersectionObserver), never while the page is hidden, and switches to static
+main thread, one rAF scheduler draws each thumbnail at ~8 fps at most, round-robin. Its budget is the real cost of a
+tick (the drawing calls plus the raster / upload of the changed canvases and the commit), measured from the tick to the
+first task after its frame minus a probed baseline frame: a tick draws what fits in ~6 ms of that (at least one
+thumbnail) and the scheduler then idles 5x the measured cost, so the thumbnails take about 1/6 of the main thread at
+most and a slow device gets slower thumbnails. It draws only tiles on screen (IntersectionObserver), never while the
+page is hidden, and switches to static
 frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and while `armed` with
 `transport: "webusb"`. `app.js` loads it with a dynamic `import()`: if it fails the tiles keep their pattern glyph.
 
@@ -210,14 +214,19 @@ frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and wh
 "Consola profesional": design tokens are CSS custom properties at the top of `static/app.css` (palette, 4/8/12/16/24
 spacing, radii); flat 1px-bordered panels, glow only in the laser preview and on the armed state; system fonts only.
 The status strip shows connection, DAC/SIMULADOR, fps · pts, BPM and the armed state. The arm / blackout control and
-the live bar (8 quick colours → `{type:"scene", scene:{color}}`, TAP → `{type:"tap"}` with the BPM, and a chip with
-the current effect that opens the Efecto tab) sit under the preview on every layout; they use the same messages as
-the panels, so they work in both transports.
+the live bar sit next to the preview on every layout: 8 quick colours (one tap = that colour on the laser:
+`{type:"scene", scene:{color, colorMode:"solid"}}`; a colour shows as selected only in solid mode, since rainbow /
+cycle / beat ignore the base colour), TAP → `{type:"tap"}` with the BPM, and a chip with the current effect that opens
+the Efecto tab. They use the same messages as the panels, so they work in both transports. Armed labels are white on
+`--live-fill` (#d92d20, 4.8:1); `--live` (#ff3b30) is for borders, glow and dots. Nothing animates a property the
+compositor cannot run (no box-shadow pulses): in WebUSB mode the output loop shares the main thread. Touch targets
+are at least 44 px tall.
 
 | Layout                                              | Arrangement                                                                  |
 | --------------------------------------------------- | ---------------------------------------------------------------------------- |
-| phone portrait (default)                            | strip, preview, arm, live bar, then the panel with a bottom tab bar (Cues is a tab) |
-| phone landscape (`landscape`, height < 520 px)      | preview + arm/live bar column on the left, panel and tab bar on the right    |
+| phone portrait (default, height > 760 px)           | strip, preview, arm, quick colours, TAP + effect, then the panel (≥ 280 px) with a bottom tab bar (Cues is a tab) |
+| phone portrait, short (height ≤ 760 px)             | TAP + effect beside the preview, then arm and quick colours; the panel keeps 280 px down to ~650 px of height, the preview then stops at a quarter of the height (≥ 130 px) |
+| phone landscape (`landscape`, height < 520 px)      | preview + arm/colours/live bar column on the left, panel and tab bar on the right; up to 740 px wide TAP + effect go under the preview |
 | tablet / small laptop (width ≥ 600, height ≥ 520)   | left: preview, arm, live bar, cue grid; right: tabs on top of the panel      |
 | desktop (width ≥ 1100, height ≥ 520)                | preview + arm + live bar · cue grid 4×4 · tabs + panel, all visible at once  |
 

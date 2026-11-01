@@ -24,8 +24,8 @@ usarla como app.
 | **Dibujo**  | Dibuja con el dedo y se proyecta al instante.                                                                                                                                                              |
 | **Ajustes** | Puntos por segundo (pps), brillo máximo, área de escaneo, invertir/intercambiar ejes, protección de haz y búsqueda de DACs.                                                                                |
 
-Debajo del botón de emisión hay una **barra rápida en vivo**: 8 colores de un toque, **TAP** con el BPM actual y el
-efecto en uso (tócalo para abrir la pestaña Efecto). En tablet y computadora la pantalla se reparte en columnas: en
+Junto al botón de emisión hay una **barra rápida en vivo**: 8 colores de un toque (el láser pasa a ese color fijo),
+**TAP** con el BPM actual y el efecto en uso (tócalo para abrir la pestaña Efecto). En tablet y computadora la pantalla se reparte en columnas: en
 tablet, vista previa y cues a la izquierda y los controles a la derecha; en computadora (desde 1100 px de ancho), vista
 previa, cues y controles a la vez, sin cambiar de pestaña.
 

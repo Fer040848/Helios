@@ -291,6 +291,12 @@ function onStatus(status) {
   $("#conn-label").textContent = "Desconectado";
   cancelHold();
   renderArm();
+  // the UI no longer knows what is emitted: drop the last frame and the beam-safety badge with it
+  frameStrokes = [];
+  blankedAt = -Infinity;
+  blankShown = false;
+  blankBadge.hidden = true;
+  invalidatePreview();
 }
 function onMessage(msg) {
   if (msg.type === "state" && msg.state) applyState(msg.state);
@@ -426,6 +432,7 @@ const preview = $("#preview"),
   blankBadge = $("#blank-badge");
 let frameStrokes = [],
   previewRaf = 0,
+  previewW = 0, // CSS px, from the ResizeObserver
   guides = null, // cached static layer (grid, crosshair, full range, scan area)
   guidesKey = "",
   scanSize = null, // as last reported by the server (the real output, not the slider being dragged)
@@ -448,11 +455,19 @@ function renderScanArea() {
   const s = S?.settings?.scanSize;
   if (typeof s !== "number" || s === scanSize) return;
   scanSize = s;
-  scanLabel.textContent = `ÁREA DE ESCANEO ${Math.round(s * 100)}%`;
+  renderScanLabel();
   scanLabel.hidden = false;
   scanLabel.classList.toggle("outside", s < 0.4); // too small to hold the label: put it under the rectangle
   $("#preview-wrap").style.setProperty("--scan", s);
   invalidatePreview();
+}
+// The label starts inside the scan rectangle and must end inside the preview: the short form on small previews.
+function renderScanLabel() {
+  if (scanSize === null) return;
+  const pct = Math.round(scanSize * 100),
+    room = previewW * (scanSize < 0.4 ? 1 : (1 + scanSize) / 2) - 8;
+  scanLabel.textContent =
+    previewW && room < 140 ? `ESCANEO ${pct}%` : `ÁREA DE ESCANEO ${pct}%`;
 }
 function onFrame(msg) {
   frameStrokes = Array.isArray(msg.strokes) ? msg.strokes : [];
@@ -467,7 +482,12 @@ function onFrame(msg) {
   }
   invalidatePreview();
 }
-new ResizeObserver(invalidatePreview).observe(preview);
+new ResizeObserver((entries) => {
+  previewW = entries[entries.length - 1].contentRect.width;
+  $("#preview-wrap").classList.toggle("compact", previewW < 200); // smaller beam-safety badge
+  renderScanLabel();
+  invalidatePreview();
+}).observe(preview);
 
 // ---------- cues ----------
 const cueGrid = $("#cue-grid");
@@ -686,16 +706,27 @@ function showXY(x, y) {
 const colorInput = $("#color-input");
 {
   const th = throttle((c) => sendValue("scene.color", c), SEND_MS);
-  const pick = (e) => {
+  $("#swatches").addEventListener("click", (e) => {
     const b = e.target.closest("[data-color]");
     if (b) {
       touch("scene.color");
       showColor(b.dataset.color);
       sendValue("scene.color", b.dataset.color);
     }
-  };
-  $("#swatches").addEventListener("click", pick);
-  $("#quick-colors").addEventListener("click", pick); // live bar
+  });
+  // Live bar: one tap = that colour on the laser. The rainbow / cycle / beat modes ignore the base colour, so the
+  // tap also sets the colour mode to solid, in the same scene message.
+  $("#quick-colors").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-color]");
+    if (!b) return;
+    const color = b.dataset.color;
+    touch("scene.color");
+    touch("scene.colorMode");
+    showColor(color);
+    selectChoice($("#color-modes"), "solid");
+    showQuickColor(color, "solid");
+    send({ type: "scene", scene: { color, colorMode: "solid" } });
+  });
   colorInput.addEventListener("input", () => {
     touch("scene.color");
     showColor(colorInput.value);
@@ -706,7 +737,7 @@ const colorInput = $("#color-input");
 }
 function showColor(c) {
   c = String(c).toLowerCase();
-  $$("#swatches [data-color], #quick-colors [data-color]").forEach((b) => {
+  $$("#swatches [data-color]").forEach((b) => {
     const on = b.dataset.color === c;
     b.classList.toggle("on", on);
     b.setAttribute("aria-checked", on);
@@ -748,11 +779,22 @@ function showColor(c) {
   });
 }
 
-// ---------- live bar (BPM readouts, effect chip) ----------
+// ---------- live bar (quick colours, BPM readouts, effect chip) ----------
 const setText = (el, t) => {
   if (el.textContent !== t) el.textContent = t;
 };
+// A quick colour shows as selected only when it is what the laser shows: solid mode in that colour.
+function showQuickColor(color, mode) {
+  const c = String(color).toLowerCase();
+  $$("#quick-colors [data-color]").forEach((b) => {
+    const on = mode === "solid" && b.dataset.color === c;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-checked", on);
+  });
+}
 function renderLiveBar() {
+  // from the state (not a binding with a grace period): a cue fired right after a tap must clear the mark at once
+  showQuickColor(S?.scene?.color, S?.scene?.colorMode);
   // straight from the state, not a binding: the readouts follow the real tempo even while the BPM slider is held
   const bpm = String(Math.round((S?.bpm ?? 120) * 10) / 10);
   setText($("#strip-bpm"), bpm);
