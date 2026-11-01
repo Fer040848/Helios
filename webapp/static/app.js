@@ -456,19 +456,23 @@ function renderScanArea() {
   const s = S?.settings?.scanSize;
   if (typeof s !== "number" || s === scanSize) return;
   scanSize = s;
-  renderScanLabel();
   scanLabel.hidden = false;
   scanLabel.classList.toggle("outside", s < 0.4); // too small to hold the label: put it under the rectangle
   $("#preview-wrap").style.setProperty("--scan", s);
+  renderScanLabel(); // measures: after the position and the room are set
   invalidatePreview();
 }
-// The label starts inside the scan rectangle and must end inside the preview: the short form on small previews.
+// The label starts inside the scan rectangle and must end inside the preview (its CSS max-width): the longest form
+// whose text fits, measured, so the ellipsis never cuts the figure. Runs on scan size and preview size changes only.
+const scanRange = document.createRange();
 function renderScanLabel() {
   if (scanSize === null) return;
-  const pct = Math.round(scanSize * 100),
-    room = previewW * (scanSize < 0.4 ? 1 : (1 + scanSize) / 2) - 8;
-  scanLabel.textContent =
-    previewW && room < 140 ? `ESCANEO ${pct}%` : `ÁREA DE ESCANEO ${pct}%`;
+  const pct = `${Math.round(scanSize * 100)}%`;
+  for (const text of [`ÁREA DE ESCANEO ${pct}`, `ESCANEO ${pct}`, pct]) {
+    scanLabel.textContent = text;
+    scanRange.selectNodeContents(scanLabel); // the whole text, also the part an ellipsis would hide
+    if (scanRange.getBoundingClientRect().width <= scanLabel.getBoundingClientRect().width + 0.01) break;
+  }
 }
 function onFrame(msg) {
   frameStrokes = Array.isArray(msg.strokes) ? msg.strokes : [];

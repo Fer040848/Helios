@@ -345,7 +345,7 @@ body.offline .arm-state {
   animation: dot 1.2s infinite;
 }
 /* Scan-area label: bottom-left corner inside the dashed scan rectangle drawn on the canvas (--scan = scanSize).
-   app.js shortens it on small previews; the max-width keeps it inside the preview in any case. */
+   The max-width keeps it inside the preview; app.js picks the longest form that fits it (the ellipsis is a fallback). */
 .scan-label {
   position: absolute;
   left: calc((1 - var(--scan, 1)) * 50% + 6px);
