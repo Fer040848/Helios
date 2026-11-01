@@ -204,3 +204,22 @@ main thread, one rAF scheduler draws each thumbnail at ~8 fps within a ~4 ms bud
 round-robin), only for tiles on screen (IntersectionObserver), never while the page is hidden, and switches to static
 frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and while `armed` with
 `transport: "webusb"`. `app.js` loads it with a dynamic `import()`: if it fails the tiles keep their pattern glyph.
+
+## UI layout and theme
+
+"Consola profesional": design tokens are CSS custom properties at the top of `static/app.css` (palette, 4/8/12/16/24
+spacing, radii); flat 1px-bordered panels, glow only in the laser preview and on the armed state; system fonts only.
+The status strip shows connection, DAC/SIMULADOR, fps · pts, BPM and the armed state. The arm / blackout control and
+the live bar (8 quick colours → `{type:"scene", scene:{color}}`, TAP → `{type:"tap"}` with the BPM, and a chip with
+the current effect that opens the Efecto tab) sit under the preview on every layout; they use the same messages as
+the panels, so they work in both transports.
+
+| Layout                                              | Arrangement                                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| phone portrait (default)                            | strip, preview, arm, live bar, then the panel with a bottom tab bar (Cues is a tab) |
+| phone landscape (`landscape`, height < 520 px)      | preview + arm/live bar column on the left, panel and tab bar on the right    |
+| tablet / small laptop (width ≥ 600, height ≥ 520)   | left: preview, arm, live bar, cue grid; right: tabs on top of the panel      |
+| desktop (width ≥ 1100, height ≥ 520)                | preview + arm + live bar · cue grid 4×4 · tabs + panel, all visible at once  |
+
+On tablet and desktop the Cues tab is hidden and the cue grid is always shown; `app.js` uses the same media query
+(`wideQuery`) to decide which pages are visible.
