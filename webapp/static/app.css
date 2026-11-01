@@ -184,12 +184,17 @@ body:not(.offline) #conn-label {
   display: none;
 }
 .badge {
+  /* A button (it opens Ajustes): a 44 px tall touch target; ::before draws the small chip in its middle, and the
+     negative margins keep the strip at its height (the target reaches 2 px past it, above the stage's padding). */
+  position: relative;
+  z-index: 1;
   min-width: 0;
   max-width: 34vw;
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--panel-2);
+  min-height: var(--hit);
+  margin: -12px 0;
+  padding: 0 7px;
+  border: 0;
+  background: none;
   color: var(--text);
   font-size: 11px;
   font-weight: 600;
@@ -198,15 +203,38 @@ body:not(.offline) #conn-label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.badge:hover {
+.badge::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  top: calc(50% - 0.7em - 3px);
+  height: calc(1.4em + 6px); /* one line of text + 2 px padding + 1 px border, each side */
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+}
+.badge:focus-visible {
+  outline: none;
+}
+.badge:focus-visible::before {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.badge:hover::before {
   border-color: var(--accent);
 }
 .badge.sim {
   color: var(--warn);
+}
+.badge.sim::before {
   border-color: var(--warn-line);
 }
 .badge.real {
   color: var(--ok);
+}
+.badge.real::before {
   border-color: rgba(52, 199, 89, 0.45);
 }
 .strip-fill {
@@ -1556,7 +1584,7 @@ kbd {
     margin-left: auto;
   }
   .badge {
-    padding: 2px 5px;
+    padding: 0 6px;
     font-size: 10.5px;
     letter-spacing: 0.02em;
   }

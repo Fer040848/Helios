@@ -322,6 +322,7 @@ function applyState(s) {
     : dacs.length
       ? dacs[0].name + (dacs.length > 1 ? ` +${dacs.length - 1}` : "")
       : "SIN DAC";
+  dac.setAttribute("aria-label", `Salida: ${dac.textContent}. Abrir Ajustes para ver o conectar el DAC`);
   $$("[data-list]").forEach(fillChoices);
   renderArm();
   renderCues();

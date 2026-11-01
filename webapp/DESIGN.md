@@ -213,7 +213,8 @@ frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and wh
 
 "Consola profesional": design tokens are CSS custom properties at the top of `static/app.css` (palette, 4/8/12/16/24
 spacing, radii); flat 1px-bordered panels, glow only in the laser preview and on the armed state; system fonts only.
-The status strip shows connection, DAC/SIMULADOR, fps · pts, BPM and the armed state. The arm / blackout control and
+The status strip shows connection, DAC/SIMULADOR (a button to Ajustes, where the DAC is connected), fps · pts, BPM and
+the armed state. The arm / blackout control and
 the live bar sit next to the preview on every layout: 8 quick colours (one tap = that colour on the laser:
 `{type:"scene", scene:{color, colorMode:"solid"}}`; a colour shows as selected only in solid mode, since rainbow /
 cycle / beat ignore the base colour), TAP → `{type:"tap"}` with the BPM, and a chip with the current effect that opens
