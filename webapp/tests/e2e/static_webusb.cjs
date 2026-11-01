@@ -218,6 +218,29 @@ const FAKE_USB = () => {
     // gets fewer redraws by design; this only checks the 16 tiles never freeze
     assert(st.renders / 3 >= 16 * 2, `16 thumbnails keep animating (${(st.renders / 3 / 16).toFixed(1)} fps each)`);
     assert((await thumbs(perf)).filter((t) => t && t.lit >= 10).length >= 15, '16 cues: the thumbnails draw their figures');
+    // A long frame of other work (a GC pause, a heavy layout, another rAF callback: here 300 ms of it in the frame of a
+    // thumbnail tick) is not charged to the thumbnails: they resume within a couple of frames, not 5x 300 ms later.
+    const resume = await perf.evaluate(async () => {
+      const st = (await import('/static/thumbs.js')).stats, raf = window.requestAnimationFrame;
+      const gap = new Promise((resolve) => {
+        window.requestAnimationFrame = (cb) => {
+          const id = raf.call(window, cb);
+          if (cb.name === 'tick') {
+            window.requestAnimationFrame = raf;
+            raf.call(window, () => { // same frame, after the tick
+              const end = performance.now() + 300;
+              while (performance.now() < end);
+              const [r0, t0] = [st.renders, performance.now()];
+              const poll = () => (st.renders > r0 ? resolve(performance.now() - t0) : setTimeout(poll, 4));
+              poll();
+            });
+          }
+          return id;
+        };
+      });
+      return Promise.race([gap, new Promise((r) => setTimeout(() => r(Infinity), 5000))]);
+    });
+    assert(resume < 500, `after a 300 ms frame of other work the thumbnails resume in ${resume.toFixed(0)} ms (< 500)`);
     await perf.screenshot({ path: path.join(OUT, 'web-usb-cues16.png') });
     await perfCtx.close();
 

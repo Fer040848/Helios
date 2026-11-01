@@ -20,6 +20,8 @@ const FRAME_MS = 125, // ~8 fps per thumbnail at most
   SLACK_MS = 20, // a thumbnail due within this is drawn now, so they stay grouped in one tick
   TICK_MS = 6, // per tick, in real main-thread time (drawing + raster / upload of the changed canvases)
   DUTY = 5, // after a tick, idle DUTY x its real cost (thumbnails: ~1/6 of the main thread at most)
+  MAX_RATIO = 10, // a tick's real cost is charged at most this many times its drawing calls
+  MAX_IDLE_MS = 250, // two thumbnail frames: the longest the thumbnails ever pause after a tick
   PROBE_EVERY = 8,
   MAX_DT = 0.25, // s; a paused thumbnail resumes without a visible jump
   MAX_DPR = 2,
@@ -60,10 +62,12 @@ afterFrame.port1.onmessage = () => {
   measuring = false;
   if (probe) baseline = 0.7 * baseline + 0.3 * frame;
   else {
-    const real = Math.max(tickJs, frame - baseline);
-    ratio = Math.min(10, Math.max(1, 0.8 * ratio + 0.2 * (real / Math.max(0.1, tickJs))));
+    // A long frame of other work (a GC pause, a heavy layout, another rAF callback) is not the thumbnails' cost: the
+    // sample is capped, and so is the idle, so stray work never freezes the thumbnails (or a changed cue's) for long.
+    const real = Math.max(tickJs, Math.min(frame - baseline, MAX_RATIO * tickJs));
+    ratio = Math.min(MAX_RATIO, Math.max(1, 0.8 * ratio + 0.2 * (real / Math.max(0.1, tickJs))));
     stats.realMs += real;
-    idleUntil = now + DUTY * real;
+    idleUntil = now + Math.min(DUTY * real, MAX_IDLE_MS);
     if (++sinceProbe >= PROBE_EVERY) {
       sinceProbe = 0;
       measuring = true; // no tick until the probe frame is measured

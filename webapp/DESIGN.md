@@ -204,7 +204,8 @@ main thread, one rAF scheduler draws each thumbnail at ~8 fps at most, round-rob
 tick (the drawing calls plus the raster / upload of the changed canvases and the commit), measured from the tick to the
 first task after its frame minus a probed baseline frame: a tick draws what fits in ~6 ms of that (at least one
 thumbnail) and the scheduler then idles 5x the measured cost, so the thumbnails take about 1/6 of the main thread at
-most and a slow device gets slower thumbnails. It draws only tiles on screen (IntersectionObserver), never while the
+most and a slow device gets slower thumbnails. A long frame of other work (GC, layout) is not charged to them: a sample
+counts at most 10x the drawing calls and the idle is at most 250 ms. It draws only tiles on screen (IntersectionObserver), never while the
 page is hidden, and switches to static
 frames (draw a changed cue once, then stop) with `prefers-reduced-motion` and while `armed` with
 `transport: "webusb"`. `app.js` loads it with a dynamic `import()`: if it fails the tiles keep their pattern glyph.
