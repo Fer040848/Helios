@@ -13,8 +13,9 @@ import { mergeScene, SCENE_DEFAULTS } from "./engine/model.js";
 import { Clocks, compose } from "./engine/effects.js";
 
 const FRAME_MS = 125, // ~8 fps per thumbnail
+  SLACK_MS = 20, // a thumbnail due within this is drawn now, so they stay grouped in one tick
   BUDGET_MS = 4, // per tick
-  MAX_DT = 0.5, // s; a thumbnail that was paused resumes smoothly instead of jumping
+  MAX_DT = 0.25, // s; a paused thumbnail resumes without a visible jump
   MAX_DPR = 2,
   MAX_VERTICES = 600, // decimate denser figures: a thumbnail is under 200 device px wide
   LINE_CSS_PX = 1.25;
@@ -123,7 +124,7 @@ export function update(state) {
 
 function due(t, now) {
   if (!t || !t.scene || !t.visible || !t.w || !t.h) return false;
-  return t.dirty || (animating() && now >= t.next);
+  return t.dirty || (animating() && now + SLACK_MS >= t.next);
 }
 
 function schedule() {
@@ -139,7 +140,7 @@ function schedule() {
       wait = 0;
       break;
     }
-    if (animating()) wait = Math.min(wait, t.next - now);
+    if (animating()) wait = Math.min(wait, t.next - SLACK_MS - now);
   }
   if (wait === Infinity) return; // nothing to draw: the scheduler stops until something changes
   if (wait <= 1) raf = requestAnimationFrame(tick);
@@ -165,7 +166,7 @@ function tick() {
       cursor = i; // out of budget: continue from this tile on the next frame
       break;
     }
-    render(t, start);
+    render(t, t0);
     const ms = performance.now() - start;
     t.cost = t.cost ? 0.8 * t.cost + 0.2 * ms : ms;
     done++;
@@ -204,7 +205,10 @@ function render(t, now) {
 const colorCache = new Map();
 function css(r, g, b) {
   // 5 bits per channel: fewer strokeStyle changes along rainbow figures, invisible at this size
-  const key = ((r * 31 + 0.5) | 0) * 1024 + ((g * 31 + 0.5) | 0) * 32 + ((b * 31 + 0.5) | 0);
+  const key =
+    ((r * 31 + 0.5) | 0) * 1024 +
+    ((g * 31 + 0.5) | 0) * 32 +
+    ((b * 31 + 0.5) | 0);
   let c = colorCache.get(key);
   if (!c) {
     const q = (v) => Math.round(((v * 31 + 0.5) | 0) * (255 / 31));
@@ -237,7 +241,8 @@ function draw(t, strokes) {
   ctx.lineWidth = Math.max(1, LINE_CSS_PX * t.dpr);
   for (const st of strokes) {
     let pts = st.points;
-    if (step > 1 && pts.length > 2) pts = pts.filter((_, i) => i % step === 0 || i === st.points.length - 1);
+    if (step > 1 && pts.length > 2)
+      pts = pts.filter((_, i) => i % step === 0 || i === st.points.length - 1);
     const n = pts.length;
     if (n === 1) {
       const [x, y, r, g, b] = pts[0];
