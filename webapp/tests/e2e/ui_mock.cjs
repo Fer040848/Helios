@@ -23,7 +23,7 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
 
     const state = makeState();
     const sent = [];
-    let sock = null, connections = 0, blanked = false, refuse = false;
+    let sock = null, connections = 0, blanked = false, refuse = false, sceneLag = 0; // sceneLag: ms before the server applies a scene
     const wire = (p) => p.routeWebSocket('**/ws', (ws) => {
       if (refuse) { ws.close(); return; } // a server that is down: the UI stays offline and keeps retrying
       sock = ws; connections++;
@@ -38,7 +38,10 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
         sent.push(msg);
         if (msg.type === 'arm') { state.armed = !!msg.armed; push(); }
         else if (msg.type === 'blackout') { state.armed = false; push(); }
-        else if (msg.type === 'scene') { Object.assign(state.scene, msg.scene); state.activeCue = null; push(); }
+        else if (msg.type === 'scene') {
+          const apply = () => { Object.assign(state.scene, msg.scene); state.activeCue = null; push(); };
+          if (sceneLag) setTimeout(apply, sceneLag); else apply();
+        }
         else if (msg.type === 'settings') { Object.assign(state.settings, msg.settings); push(); }
         else if (msg.type === 'cue' && state.cues[msg.index]) { Object.assign(state.scene, state.cues[msg.index].scene); state.activeCue = msg.index; push(); }
         else if (msg.type === 'tap') { state.bpm = 128; push(); }
@@ -78,6 +81,35 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
     }, sel);
     const aa = async (p, sel, what) => { const c = await contrast(p, sel); assert(c >= 4.5, `${what}: text contrast ${c}:1 >= 4.5:1 (WCAG AA)`); };
+    // A touch target at least 44 px tall: its box, and every on-screen point of the vertical line through its centre
+    // lands on it (nothing covers it).
+    const tallTarget = async (p, sel, what) => {
+      const t = await p.evaluate((s) => {
+        const el = document.querySelector(s), r = el.getBoundingClientRect(), x = r.x + r.width / 2;
+        let miss = 0;
+        for (let y = Math.max(0, Math.ceil(r.top)); y < Math.min(innerHeight, r.bottom); y++) if (!el.contains(document.elementFromPoint(x, y))) miss++;
+        return { h: r.height, miss };
+      }, sel);
+      assert(t.h >= 44 && t.miss === 0, `${what}: ${sel} is a ${t.h.toFixed(1)} px tall touch target (>= 44${t.miss ? `, ${t.miss} px covered` : ''})`);
+    };
+    // The scan-area label at scan size s: its whole text (the figure included) fits the label, and the label is inside
+    // the preview.
+    const scanLabelFits = async (p, vp) => {
+      for (const s of [0.1, 0.4, 0.45, 0.5, 1, 0.8]) {
+        state.settings.scanSize = s;
+        sock.send(JSON.stringify({ type: 'state', state }));
+        const pct = `${Math.round(s * 100)}%`;
+        await p.waitForFunction((pct) => document.getElementById('scan-label').textContent.endsWith(pct), pct);
+        const l = await p.evaluate(() => {
+          const el = document.getElementById('scan-label'), r = el.getBoundingClientRect(), pw = document.getElementById('preview-wrap').getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return { text: el.textContent, whole: range.getBoundingClientRect().width <= r.width + 0.01 && el.scrollWidth <= el.clientWidth,
+            inside: r.left >= pw.left - 0.5 && r.right <= pw.right + 0.5 && r.bottom <= pw.bottom + 0.5 };
+        });
+        assert(l.whole && l.inside, `${vp}, scan ${pct}: scan label "${l.text}" shown whole inside the preview`);
+      }
+    };
     // Running CSS animations (not the one-shot 0.2 s transitions) of properties the compositor cannot animate: each one
     // costs a main-thread frame per vsync, and in WebUSB mode the output loop shares that thread. opacity and transform
     // are fine.
@@ -97,6 +129,8 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     assert(await page.locator('.cue.empty').count() === 16 - state.cues.filter(Boolean).length, 'empty slots marked');
     assert(await page.locator('#patterns button').count() === state.patterns.length, 'pattern list from state');
     assert((await page.locator('#dac').textContent()) === 'SIMULADOR', 'SIMULADOR badge');
+    assert((await page.locator('#dac').getAttribute('aria-label')) === 'Salida: SIMULADOR. Abrir Ajustes para ver o conectar el DAC',
+      'the DAC badge button is named by the output and what it does');
 
     await sleep(300);
     // lit = brighter than the static preview guides (grid, crosshair, range, scan area) can be: laser light only
@@ -127,6 +161,33 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     await waitMsg((m) => m.type === 'scene' && m.scene.color === '#00ffff' && m.scene.colorMode === 'solid', 'rainbow mode: a quick colour sends the colour with colorMode solid');
     await page.waitForFunction(() => document.querySelector('#quick-colors [data-color="#00ffff"]').classList.contains('on'));
     assert(state.scene.colorMode === 'solid' && state.scene.color === '#00ffff', 'rainbow mode: after the tap the scene is solid cyan');
+    // A state already on its way when a quick colour is tapped (the server has not applied the tap yet) keeps the mark,
+    // as the Color tab keeps "solid"; a cue fired right after a quick colour clears the mark at once, in both places.
+    {
+      const marks = () => page.evaluate(() => JSON.stringify([[...document.querySelectorAll('#quick-colors .on')].map((b) => b.dataset.color),
+        [...document.querySelectorAll('#color-modes .on')].map((b) => b.dataset.value)]));
+      await sleep(450); // past the grace period of the cyan tap
+      await page.locator('.cue[data-index="1"]').tap();
+      await page.waitForFunction(() => document.querySelector('#color-modes .on')?.dataset.value === 'rainbow' && !document.querySelector('#quick-colors .on'));
+      sceneLag = 600;
+      await page.locator('#quick-colors [data-color="#0000ff"]').tap();
+      await waitMsg((m) => m.type === 'scene' && m.scene.color === '#0000ff', 'quick colour blue sent (the server applies it 600 ms later)');
+      sock.send(JSON.stringify({ type: 'state', state })); // stale: still the rainbow cue
+      await sleep(150);
+      const stale = await marks();
+      assert(stale === '[["#0000ff"],["solid"]]', `a stale state right after the tap keeps the quick colour mark and "solid" (${stale})`);
+      await page.waitForFunction(() => document.querySelector('#quick-colors [data-color="#0000ff"]').classList.contains('on'));
+      while (state.scene.color !== '#0000ff') await sleep(25);
+      sceneLag = 0;
+      await sleep(100);
+      assert(await marks() === '[["#0000ff"],["solid"]]', 'the state with the tap applied keeps the mark');
+      await page.locator('#quick-colors [data-color="#ff0000"]').tap();
+      await page.locator('.cue[data-index="1"]').tap();
+      await page.waitForFunction(() => document.querySelector('#color-modes .on')?.dataset.value === 'rainbow' && !document.querySelector('#quick-colors .on'),
+        null, { timeout: 1500 }).catch(() => {});
+      const cued = await marks();
+      assert(cued === '[[],["rainbow"]]', `a rainbow cue fired right after a quick colour clears the mark and the Color tab says rainbow (${cued})`);
+    }
     // TAP sends a tap; the BPM readouts follow the state.
     await page.locator('#live-tap').tap();
     await waitMsg((m) => m.type === 'tap', 'live bar TAP sends {type:tap}');
@@ -222,7 +283,7 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
     // Phone portrait sizes (in-browser viewports with toolbars included): the arm, the quick colours and the live bar
     // span the stage; colour and segmented targets are 44 px tall; the panel keeps its room; Deshacer / Borrar and the
     // drawing pad stay above the tab bar.
-    for (const [w, h, minPanel, padFits] of [[390, 844, 278, 1], [390, 664, 270, 1], [360, 640, 255, 1], [320, 568, 200, 0]]) {
+    for (const [w, h, minPanel, padFits] of [[390, 844, 278, 1], [390, 664, 270, 1], [360, 640, 255, 1], [320, 568, 200, 1]]) {
       await page.setViewportSize({ width: w, height: h });
       await tab('cues');
       await sleep(250);
@@ -238,6 +299,8 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       const scan = await page.evaluate(() => { const l = document.getElementById('scan-label'); return { text: l.textContent, whole: l.scrollWidth <= l.clientWidth,
         inside: l.getBoundingClientRect().right <= document.getElementById('preview-wrap').getBoundingClientRect().right }; });
       assert(scan.whole && scan.inside, `${vp}: scan label "${scan.text}" shown whole inside the preview`);
+      await scanLabelFits(page, vp);
+      await tallTarget(page, '#dac', vp);
       if (w === 360) await page.screenshot({ path: path.join(OUT, 'redesign-phone-short.png') });
       await tab('shape');
       const seg = await page.evaluate(() => Math.min(...[...document.querySelectorAll('#page-shape .seg button')].map((b) => b.getBoundingClientRect().height)));
@@ -247,6 +310,18 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       assert(undo.b <= tb.y && clear.b <= tb.y && undo.h >= 44, `${vp}: Deshacer / Borrar fully above the tab bar`);
       if (padFits) assert(pad.b <= tb.y + 0.5, `${vp}: the drawing pad (${Math.round(pad.w)} px) fits above the tab bar`);
       if (w === 360) await page.screenshot({ path: path.join(OUT, 'redesign-phone-short-draw.png') });
+    }
+    // Shorter phone screens (browser bars shown; 375x548 is an iPhone SE in Safari): the drawing pad still fits above
+    // the tab bar, and the scan label stays whole.
+    for (const [w, h] of [[360, 560], [375, 548]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await tab('cues');
+      await sleep(250);
+      await armOnScreen(page, `${w}x${h}`);
+      await scanLabelFits(page, `${w}x${h}`);
+      await tab('draw');
+      const [pad, tb] = await Promise.all(['#draw', '.tabbar'].map((s) => box(page, s)));
+      assert(pad.b <= tb.y + 0.5, `${w}x${h}: the drawing pad (${Math.round(pad.w)} px) fits above the tab bar`);
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await tab('settings');
@@ -273,6 +348,8 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       const [pv, live, grid] = [await box(page, '.preview-wrap'), await box(page, '#livebar'), await box(page, '#cue-grid')];
       assert(onScreen(live) && pv.r <= grid.x && await page.locator('#tab-cues').isVisible(), 'phone landscape: preview, arm and live bar left of the panels; Cues still a tab');
     }
+    await tallTarget(page, '#dac', 'phone landscape');
+    await scanLabelFits(page, '844x390');
     // Small phone in landscape (667x375): TAP / effect under the preview so the preview can grow; the scan label fits.
     await page.setViewportSize({ width: 667, height: 375 });
     await sleep(300);
@@ -284,6 +361,14 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       const clipped = await page.evaluate(() => { const l = document.getElementById('scan-label'); return l.scrollWidth > l.clientWidth; });
       assert(label.r <= pv.r && !clipped, `667x375: scan label "${await page.locator('#scan-label').textContent()}" fits in the preview`);
     }
+    await scanLabelFits(page, '667x375');
+    // iPhone SE (1st gen.) in landscape: the smallest preview of the landscape layout
+    await page.setViewportSize({ width: 568, height: 320 });
+    await sleep(300);
+    await armOnScreen(page, '568x320');
+    await scanLabelFits(page, '568x320');
+    await page.setViewportSize({ width: 667, height: 375 });
+    await sleep(300);
 
     // Connection lost right after beam safety blanked frames (the badge is still held up) and the server does not come
     // back: the badge and the last frame go (the UI no longer knows what is emitted); the banner never covers the arm.
@@ -320,6 +405,7 @@ function assert(cond, what) { if (!cond) throw new Error(`ASSERT FAILED: ${what}
       assert([pv, arm, live, grid].every((b) => b.r <= 410.5) && panel.x >= 409.5 && tabs.x >= 409.5, 'tablet: two columns (stage + cues left, tabs + panel right)');
       assert(tabs.y < panel.y && !(await page.locator('#tab-cues').isVisible()), 'tablet: tabs on top of the panel, no Cues tab');
       await armOnScreen(page, 'tablet');
+      await tallTarget(page, '#dac', 'tablet');
       await tab('color');
       assert(await page.locator('#page-color').isVisible() && await page.locator('#cue-grid').isVisible(), 'tablet: switching tabs keeps the cue grid visible');
     }
