@@ -201,8 +201,8 @@ const FAKE_USB = () => {
     const st = await perf.evaluate(async () => ({ ...(await import('/static/thumbs.js')).stats }));
     const avgTick = st.busyMs / st.ticks, perRender = st.busyMs / st.renders;
     console.log(`# thumbnail scheduler, 16 cues: ${st.ticks} ticks in 3 s, ${avgTick.toFixed(2)} ms/tick avg, ` +
-      `${st.maxMs.toFixed(1)} ms max, ${(st.renders / st.ticks).toFixed(1)} renders/tick, ${perRender.toFixed(2)} ms/render ` +
-      `${(st.realMs / st.ticks).toFixed(2)} ms/tick real (with raster and commit), split across ticks by the budget)`);
+      `${st.maxMs.toFixed(1)} ms max, ${(st.renders / st.ticks).toFixed(1)} renders/tick, ${perRender.toFixed(2)} ms/render, ` +
+      `${(st.realMs / st.ticks).toFixed(2)} ms/tick real (drawing + raster and commit of the changed canvases)`);
     assert(avgTick < 6, `one scheduler tick costs under 6 ms on average (${avgTick.toFixed(2)} ms)`);
     assert(st.renders / 3 >= 16 * 4, `16 thumbnails keep animating (${(st.renders / 3 / 16).toFixed(1)} fps each)`);
     assert((await thumbs(perf)).filter((t) => t && t.lit >= 10).length >= 15, '16 cues: the thumbnails draw their figures');
@@ -211,7 +211,7 @@ const FAKE_USB = () => {
 
     // Slow device (4x CPU throttle, desktop 1440x900 at 2x, all 16 tiles on screen, disarmed): the thumbnails' share
     // of the main thread, measured as the busy time with them minus the busy time with thumbs.js blocked, must stay
-    // bounded (the scheduler idles 4x the real cost of each tick: ~20%). Counting only the drawing calls it was ~50%.
+    // bounded (the scheduler idles 5x the real cost of each tick: ~17%). Counting only the drawing calls it was ~50%.
     const busyShare = async (blockThumbs) => {
       const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
       await c.addInitScript((cues) => localStorage.setItem('helios-web/v1', JSON.stringify({ cues })), cues16);

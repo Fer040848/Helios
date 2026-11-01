@@ -2,9 +2,13 @@
 // so they work the same with the Python server and with the in-browser WebUSB backend.
 //
 // Performance: in WebUSB mode the laser output loop shares this main thread, so the thumbnails must never hold it up.
-// - one shared scheduler: a rAF tick per round, each thumbnail redrawn at ~8 fps;
-// - each tick renders only what fits in a ~4 ms budget (at least one thumbnail) and continues on the next frame,
-//   round-robin, so a slow device gets slower thumbnails, not a slower output loop;
+// - one shared scheduler: a rAF tick per round, each thumbnail redrawn at ~8 fps at most;
+// - the budget counts the real cost of a tick: the drawing calls plus the raster / upload of the changed canvases and
+//   the rest of that frame's rendering, measured from the tick to the first task after the frame (a MessageChannel
+//   message posted in the tick runs once the rendering update is done). The drawing calls alone are about a third
+//   of it, so a tick renders only what is predicted to fit in ~6 ms of real time (at least one thumbnail), and the
+//   scheduler then idles DUTY times the measured cost: the thumbnails take about 1/(DUTY+1) of the main thread at
+//   most, round-robin, so a slow device gets slower thumbnails, not a saturated main thread or a slower output loop;
 // - only tiles on screen are drawn (IntersectionObserver) and nothing runs while the page is hidden;
 // - static frames (draw a changed thumbnail once, then stop) with prefers-reduced-motion and while the in-browser
 //   backend is armed (state.transport === "webusb"), so nothing competes with the output;
@@ -12,23 +16,64 @@
 import { mergeScene, SCENE_DEFAULTS } from "./engine/model.js";
 import { Clocks, compose } from "./engine/effects.js";
 
-const FRAME_MS = 125, // ~8 fps per thumbnail
+const FRAME_MS = 125, // ~8 fps per thumbnail at most
   SLACK_MS = 20, // a thumbnail due within this is drawn now, so they stay grouped in one tick
-  BUDGET_MS = 4, // per tick
+  TICK_MS = 6, // per tick, in real main-thread time (drawing + raster / upload of the changed canvases)
+  DUTY = 5, // after a tick, idle DUTY x its real cost (thumbnails: ~1/6 of the main thread at most)
+  PROBE_EVERY = 8,
   MAX_DT = 0.25, // s; a paused thumbnail resumes without a visible jump
   MAX_DPR = 2,
   MAX_VERTICES = 600, // decimate denser figures: a thumbnail is under 200 device px wide
   LINE_CSS_PX = 1.25;
 
 /** Counters for tests and tuning; never read by the scheduler itself. */
-export const stats = { ticks: 0, renders: 0, busyMs: 0, maxMs: 0 };
+export const stats = { ticks: 0, renders: 0, busyMs: 0, maxMs: 0, realMs: 0 };
 
 const tiles = []; // index -> tile
 let bpm = 120,
   liveUsb = false,
   cursor = 0,
   raf = 0,
-  timer = 0;
+  timer = 0,
+  ratio = 3, // real cost / drawing-call cost of a tick (running average; starts at about what was measured)
+  baseline = 0, // cost of a frame without thumbnail work (running average of probe frames)
+  idleUntil = 0, // performance.now() before which no tick starts
+  measuring = false, // a tick's (or a probe frame's) cost is being measured: its message reschedules
+  probe = false,
+  tickStart = 0,
+  tickJs = 0,
+  sinceProbe = 0;
+// Real cost of a tick: from the tick to the first task after its frame, when that frame's rendering (raster and
+// upload of the changed canvases, commit) is done, minus what a frame costs without thumbnails (the other rAF
+// work, the preview). Every PROBE_EVERY ticks an empty frame is measured to keep that baseline current.
+const afterFrame = new MessageChannel();
+function measure(start, js, isProbe) {
+  measuring = true;
+  probe = isProbe;
+  tickStart = start;
+  tickJs = js;
+  afterFrame.port2.postMessage(0);
+}
+afterFrame.port1.onmessage = () => {
+  const now = performance.now(),
+    frame = now - tickStart;
+  measuring = false;
+  if (probe) baseline = 0.7 * baseline + 0.3 * frame;
+  else {
+    const real = Math.max(tickJs, frame - baseline);
+    ratio = Math.min(10, Math.max(1, 0.8 * ratio + 0.2 * (real / Math.max(0.1, tickJs))));
+    stats.realMs += real;
+    idleUntil = now + DUTY * real;
+    if (++sinceProbe >= PROBE_EVERY) {
+      sinceProbe = 0;
+      measuring = true; // no tick until the probe frame is measured
+      requestAnimationFrame(() => measure(performance.now(), 0, true));
+      return;
+    }
+  }
+  schedule();
+};
+
 const motionQuery = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
 let reduced = !!motionQuery?.matches;
 motionQuery?.addEventListener?.("change", (e) => {
@@ -128,7 +173,7 @@ function due(t, now) {
 }
 
 function schedule() {
-  if (raf) return; // the pending tick reschedules itself
+  if (raf || measuring) return; // the pending tick / the cost measurement reschedules
   clearTimeout(timer);
   timer = 0;
   if (document.hidden) return;
@@ -143,6 +188,7 @@ function schedule() {
     if (animating()) wait = Math.min(wait, t.next - now);
   }
   if (wait === Infinity) return; // nothing to draw: the scheduler stops until something changes
+  wait = Math.max(wait, idleUntil - now);
   if (wait <= 1) raf = requestAnimationFrame(tick);
   else
     timer = setTimeout(() => {
@@ -162,8 +208,8 @@ function tick() {
       t = tiles[i];
     if (!due(t, t0)) continue;
     const start = performance.now();
-    if (done && start - t0 + t.cost > BUDGET_MS) {
-      cursor = i; // out of budget: continue from this tile on the next frame
+    if (done && (start - t0 + t.cost) * ratio > TICK_MS) {
+      cursor = i; // out of budget: continue from this tile on the next tick
       break;
     }
     render(t, t0);
@@ -176,7 +222,8 @@ function tick() {
   stats.renders += done;
   stats.busyMs += ms;
   stats.maxMs = Math.max(stats.maxMs, ms);
-  schedule();
+  if (done) measure(t0, ms, false);
+  else schedule();
 }
 
 function render(t, now) {
