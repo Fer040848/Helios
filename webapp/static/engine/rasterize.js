@@ -159,7 +159,8 @@ export function beamSafe(points) {
   );
 }
 
-/** Full output stage -> { preview, points }. Preview: after output transform, colours before brightness. */
+/** Full output stage -> { preview, points, blanked }. Preview: after output transform, colours before brightness
+ * (empty when beam safety blanks the frame); blanked: true when beam safety blanked the frame. */
 export function buildFrame(worldStrokes, settings, maxPoints = MAX_POINTS) {
   const strokes = outputTransform(worldStrokes, settings);
   let points = rasterize(strokes, settings.pps, maxPoints - TAIL_BLANK);
@@ -167,10 +168,15 @@ export function buildFrame(worldStrokes, settings, maxPoints = MAX_POINTS) {
   const last = points[points.length - 1];
   for (let k = 0; k < TAIL_BLANK; k++) points.push([last[0], last[1], 0, 0, 0]);
   if (settings.beamSafety && !beamSafe(points))
-    return { preview: [], points: points.map(([x, y]) => [x, y, 0, 0, 0]) };
+    return {
+      preview: [],
+      points: points.map(([x, y]) => [x, y, 0, 0, 0]),
+      blanked: true,
+    };
   const b = settings.brightness;
   return {
     preview: strokes,
     points: points.map(([x, y, r, g, bl]) => [x, y, r * b, g * b, bl * b]),
+    blanked: false,
   };
 }

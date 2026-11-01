@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from helios_web import model  # noqa: E402
 from helios_web.effects import Clocks, compose  # noqa: E402
-from helios_web.rasterize import build_frame  # noqa: E402
+from helios_web.rasterize import build_frame_ex  # noqa: E402
 
 VARIANTS = (("none", "solid", "none"), ("wave", "rainbow", "quad"), ("pulse", "cycle", "h"),
             ("drawOn", "beat", "none"), ("orbit", "rainbow", "v"))
@@ -27,7 +27,12 @@ for pid in model.PATTERNS:
             clocks = Clocks()
             clocks.anim, clocks.effect, clocks.color, clocks.spin, clocks.beats = t, 0.37 * t, 0.8, 12.0 * t, 5.25 * t
             settings = dict(model.SETTINGS_DEFAULTS, invertX=True)
-            preview, points = build_frame(compose(scene, clocks), settings)
+            preview, points, blanked = build_frame_ex(compose(scene, clocks), settings)
             cases.append({"scene": scene, "clocks": vars(clocks), "settings": settings, "points": points,
-                          "preview": len(preview)})
+                          "preview": len(preview), "blanked": blanked})
+# a collapsed shape: beam safety blanks it
+scene = model.merge_scene(model.SCENE_DEFAULTS, {"pattern": "circle", "size": 0})
+preview, points, blanked = build_frame_ex(compose(scene, Clocks()), dict(model.SETTINGS_DEFAULTS))
+cases.append({"scene": scene, "clocks": vars(Clocks()), "settings": dict(model.SETTINGS_DEFAULTS), "points": points,
+              "preview": len(preview), "blanked": blanked})
 json.dump(cases, sys.stdout)

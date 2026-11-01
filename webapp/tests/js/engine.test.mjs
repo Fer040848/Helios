@@ -17,11 +17,13 @@ test("JS engine output matches the Python engine point for point", () => {
   const script = fileURLToPath(new URL("./make_parity.py", import.meta.url));
   const cases = JSON.parse(execFileSync(process.env.PYTHON || "python3", [script], { maxBuffer: 1 << 28 }));
   assert.ok(cases.length >= 100);
+  assert.ok(cases.some((c) => c.blanked) && cases.some((c) => !c.blanked), "parity covers blanked and lit frames");
   for (const c of cases) {
-    const { preview, points } = buildFrame(compose(c.scene, Object.assign(new Clocks(), c.clocks)), c.settings);
-    const label = `${c.scene.pattern}/${c.scene.effect}/${c.scene.colorMode}`;
+    const { preview, points, blanked } = buildFrame(compose(c.scene, Object.assign(new Clocks(), c.clocks)), c.settings);
+    const label = `${c.scene.pattern}/${c.scene.effect}/${c.scene.colorMode}/size ${c.scene.size}`;
     assert.equal(points.length, c.points.length, label);
     assert.equal(preview.length, c.preview, label);
+    assert.equal(blanked, c.blanked, label);
     points.forEach((p, i) => p.forEach((v, j) => assert.ok(Math.abs(v - c.points[i][j]) < 1e-9, `${label} #${i}`)));
   }
 });
@@ -35,6 +37,9 @@ test("frames end blanked, beam safety blanks a dot, brightness and scan size app
   const dot = buildFrame([{ points: [[0.1, 0.1, 1, 1, 1]], closed: false }], settings);
   assert.deepEqual(dot.preview, []);
   assert.ok(!dot.points.some(isLit));
+  assert.equal(dot.blanked, true, "a single dot is blanked by beam safety");
+  assert.equal(buildFrame(compose(scene({ pattern: "circle" }), new Clocks()), settings).blanked, false, "a circle is not");
+  assert.equal(buildFrame([{ points: [[0.1, 0.1, 1, 1, 1]], closed: false }], { ...settings, beamSafety: false }).blanked, false);
   assert.ok(buildFrame([{ points: [[0.1, 0.1, 1, 1, 1]], closed: false }], { ...settings, beamSafety: false }).points.some(isLit));
   assert.ok(points.length <= MAX_POINTS);
 });
@@ -85,6 +90,23 @@ function makeBackend(device) {
   const backend = new LocalBackend({ onMessage: (m) => messages.push(m), onStatus: () => {}, usb, storage: null, doc: null });
   return { backend, messages, usb };
 }
+
+test("frame messages report beam safety blanking", async () => {
+  const { backend, messages } = makeBackend(null);
+  backend.start();
+  await sleep(100);
+  const lastFrame = () => messages.filter((m) => m.type === "frame").pop();
+  assert.equal(lastFrame().blanked, false);
+  backend.send({ type: "scene", scene: { pattern: "circle", size: 0 } });
+  await sleep(150);
+  assert.equal(lastFrame().blanked, true, "a collapsed circle is blanked");
+  assert.deepEqual(lastFrame().strokes, []);
+  backend.send({ type: "scene", scene: { size: 0.6 } });
+  await sleep(150);
+  assert.equal(lastFrame().blanked, false);
+  assert.ok(lastFrame().strokes.length);
+  await backend.stop();
+});
 
 test("disarmed writes no frames; armed writes SINGLE_MODE frames; blackout stops and closes the shutter last", async () => {
   const dev = new FakeDevice();

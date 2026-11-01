@@ -10,6 +10,7 @@ from helios_web.rasterize import (
     MAX_POINTS,
     beam_safe,
     build_frame,
+    build_frame_ex,
     rasterize,
 )
 
@@ -244,6 +245,17 @@ class SafetyTests(unittest.TestCase):
         preview, points = build_frame(dot, SETTINGS)
         self.assertEqual(preview, [])
         self.assertEqual(lit(points), [])
+
+    def test_build_frame_ex_reports_beam_safety_blanking(self):
+        dot = [ColoredStroke([(0.1, 0.1, 1, 1, 1)], False)]
+        preview, points, blanked = build_frame_ex(dot, SETTINGS)
+        self.assertIs(blanked, True)
+        self.assertEqual((preview, lit(points)), ([], []))
+        self.assertIs(build_frame_ex(dot, dict(SETTINGS, beamSafety=False))[2], False)
+        preview, points, blanked = build_frame_ex(compose(scene(pattern="circle"), Clocks()), SETTINGS)
+        self.assertIs(blanked, False)
+        self.assertTrue(preview and lit(points))
+        self.assertEqual(build_frame(dot, SETTINGS), build_frame_ex(dot, SETTINGS)[:2])
 
     def test_beam_safety_blanks_a_collapsed_shape(self):
         _, points = build_frame(compose(scene(size=0.0), Clocks()), SETTINGS)

@@ -118,11 +118,14 @@ grid, spiral). Triggering a cue replaces the live scene with the cue's scene (me
 Server → client:
 
 - `{"type": "state", "state": State}` — sent on connect and after every change (coalesced to ≤ 10 per second).
-- `{"type": "frame", "strokes": [[x, y, r, g, b, x, y, r, g, b, ...], ...], "fps": float, "points": int}` — ~20 per
-  second to every client, whether armed or not. Strokes are the coloured strokes after effects, mirroring and the
-  output transform (scanSize, invert, swap), colours before brightness, x/y rounded to 3 decimals, r/g/b ints 0–255,
-  ≤ 1500 vertices in total (downsampled if needed). Empty `strokes` when beam safety blanks the frame.
-  `fps` = frames per second actually rendered; `points` = points in the last frame written / rasterised.
+- `{"type": "frame", "strokes": [[x, y, r, g, b, x, y, r, g, b, ...], ...], "fps": float, "points": int,
+  "blanked": bool}` — ~20 per second to every client, whether armed or not. Strokes are the coloured strokes after
+  effects, mirroring and the output transform (scanSize, invert, swap), colours before brightness, x/y rounded to 3
+  decimals, r/g/b ints 0–255, ≤ 1500 vertices in total (downsampled if needed). Empty `strokes` when beam safety
+  blanks the frame. `fps` = frames per second actually rendered; `points` = points in the last frame written /
+  rasterised; `blanked` = true when beam safety blanked this frame (the UI shows "PROTECCIÓN DE HAZ — CUADRO
+  APAGADO" over the preview), false otherwise (also when the frame is simply dark). Python:
+  `rasterize.build_frame_ex(...) -> (preview, points, blanked)`; JS: `buildFrame(...) -> {preview, points, blanked}`.
 - `{"type": "error", "message": str}` — invalid message; the connection stays open.
 
 Client → server:

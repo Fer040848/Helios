@@ -58,7 +58,7 @@ function circleFrame(t) {
     const rgb = [0, 1, 2].map((k) => Math.round(255 * Math.max(0, Math.min(1, Math.abs(((h * 6 + [0, 4, 2][k]) % 6) - 3) - 1))));
     s.push(+(0.6 * Math.cos(a)).toFixed(3), +(0.6 * Math.sin(a)).toFixed(3), ...rgb);
   }
-  return { type: 'frame', strokes: [s], fps: 60.2, points: 1200 };
+  return { type: 'frame', strokes: [s], fps: 60.2, points: 1200, blanked: false };
 }
 
 module.exports = { startStaticServer, makeState, circleFrame };

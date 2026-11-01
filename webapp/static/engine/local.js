@@ -58,7 +58,7 @@ class SimDac {
 }
 
 /** Encode preview strokes as flat [x, y, r, g, b, ...] lists (same as server.frame_message). */
-export function frameMessage(strokes, fps, points) {
+export function frameMessage(strokes, fps, points, blanked = false) {
   const total = strokes.reduce(
     (s, st) => s + st.points.length + (st.closed ? 1 : 0),
     0,
@@ -84,6 +84,7 @@ export function frameMessage(strokes, fps, points) {
     strokes: out,
     fps: Math.round(fps * 10) / 10,
     points,
+    blanked: !!blanked,
   };
 }
 
@@ -118,6 +119,7 @@ export class LocalBackend {
     this.usbDacs = [];
     this.clocks = new Clocks();
     this.preview = [];
+    this.blanked = false;
     this.fps = 0;
     this.points = 0;
     this.version = 0;
@@ -393,13 +395,14 @@ export class LocalBackend {
       this.scene,
       this.bpm,
     );
-    const { preview, points } = buildFrame(
+    const { preview, points, blanked } = buildFrame(
       compose(this.scene, this.clocks),
       this.settings,
       USB_MAX_POINTS,
     );
     this.preview = preview;
     this.points = points.length;
+    this.blanked = blanked;
     return points;
   }
 
@@ -480,7 +483,9 @@ export class LocalBackend {
       now - (this._lastState || 0) >= STATE_MS
     )
       this._emitState();
-    this.onMessage(frameMessage(this.preview, this.fps, this.points));
+    this.onMessage(
+      frameMessage(this.preview, this.fps, this.points, this.blanked),
+    );
   }
 
   _emitState() {

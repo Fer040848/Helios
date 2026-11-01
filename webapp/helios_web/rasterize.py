@@ -170,11 +170,11 @@ def apply_brightness(points, brightness):
     ]
 
 
-def build_frame(world_strokes, settings, max_points=MAX_POINTS):
-    """Full output stage. Returns ``(preview_strokes, points)``.
+def build_frame_ex(world_strokes, settings, max_points=MAX_POINTS):
+    """Full output stage. Returns ``(preview_strokes, points, blanked)``.
 
     ``preview_strokes`` are after the output transform with colours before brightness (empty when beam safety
-    blanks the frame); ``points`` are what goes to the DAC.
+    blanks the frame); ``points`` are what goes to the DAC; ``blanked`` is True when beam safety blanked the frame.
     """
     strokes = output_transform(world_strokes, settings)
     points = rasterize(strokes, settings["pps"], max_points - TAIL_BLANK)
@@ -183,5 +183,11 @@ def build_frame(world_strokes, settings, max_points=MAX_POINTS):
     x, y = points[-1][0], points[-1][1]
     points = points + [(x, y) + BLANK] * TAIL_BLANK
     if settings["beamSafety"] and not beam_safe(points):
-        return [], blank(points)
-    return strokes, apply_brightness(points, settings["brightness"])
+        return [], blank(points), True
+    return strokes, apply_brightness(points, settings["brightness"]), False
+
+
+def build_frame(world_strokes, settings, max_points=MAX_POINTS):
+    """``build_frame_ex`` without the blanked flag: ``(preview_strokes, points)``."""
+    preview, points, _ = build_frame_ex(world_strokes, settings, max_points)
+    return preview, points

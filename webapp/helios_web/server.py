@@ -37,8 +37,10 @@ def _dumps(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 
-def frame_message(strokes, fps, points):
-    """Encode preview strokes as flat ``[x, y, r, g, b, ...]`` lists, downsampled to MAX_PREVIEW_VERTICES."""
+def frame_message(strokes, fps, points, blanked=False):
+    """Encode preview strokes as flat ``[x, y, r, g, b, ...]`` lists, downsampled to MAX_PREVIEW_VERTICES.
+
+    ``blanked`` tells the UI that beam safety blanked this frame (``strokes`` is then empty)."""
     total = sum(len(st.points) + (1 if st.closed else 0) for st in strokes)
     step = max(1, -(-total // MAX_PREVIEW_VERTICES))
     out = []
@@ -63,7 +65,13 @@ def frame_message(strokes, fps, points):
             )
         out.append(flat)
     return _dumps(
-        {"type": "frame", "strokes": out, "fps": round(fps, 1), "points": points}
+        {
+            "type": "frame",
+            "strokes": out,
+            "fps": round(fps, 1),
+            "points": points,
+            "blanked": bool(blanked),
+        }
     )
 
 

@@ -14,7 +14,7 @@ import time
 
 from . import model
 from .effects import Clocks, compose
-from .rasterize import build_frame
+from .rasterize import build_frame_ex
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ class Engine:
         self._taps = []
         self._clocks = Clocks()
         self._preview = []
+        self._blanked = False
         self._last_tick = None
         self._avg_dt = 0.0
         self._dirty = False
@@ -211,7 +212,7 @@ class Engine:
     # ----- rendering ---------------------------------------------------------------------------------------
     def frame_snapshot(self):
         with self._lock:
-            return self._preview, self.fps, self.points
+            return self._preview, self.fps, self.points, self._blanked
 
     def render(self, dt):
         """Advance the clocks by ``dt`` and build one frame. Returns the DAC points."""
@@ -219,11 +220,11 @@ class Engine:
             scene, settings, bpm = self.scene, dict(self.settings), self.bpm
             self._clocks.advance(min(max(dt, 0.0), MAX_DT), scene, bpm)
             clocks = copy.copy(self._clocks)
-        preview, points = build_frame(
+        preview, points, blanked = build_frame_ex(
             compose(scene, clocks), settings, self.output.max_points
         )
         with self._lock:
-            self._preview, self.points = preview, len(points)
+            self._preview, self.points, self._blanked = preview, len(points), blanked
         return points, settings["pps"]
 
     def step(self):

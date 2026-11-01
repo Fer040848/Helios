@@ -89,11 +89,27 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         await self.receive(ws, "state", lambda d: d["state"]["armed"])
         frame = await self.receive(ws, "frame")
         self.assertTrue(frame["strokes"])
+        self.assertIs(frame["blanked"], False)
         x, y, r, g, b = frame["strokes"][0][:5]
         self.assertTrue(-1 <= x <= 1 and isinstance(r, int))
         await ws.send_json({"type": "blackout"})
         await self.receive(ws, "state", lambda d: not d["state"]["armed"])
         self.assertIn(("stop", 0), self.output.calls)
+        await ws.close()
+
+    async def test_frames_report_beam_safety_blanking(self):
+        ws = await self.client.ws_connect("/ws")
+        await self.receive(ws, "state")
+        await ws.send_json({"type": "scene", "scene": {"pattern": "circle", "size": 0}})
+        await self.receive(ws, "state", lambda d: d["state"]["scene"]["size"] == 0)
+        self.engine.render(0.0)
+        frame = await self.receive(ws, "frame", lambda d: d["blanked"])
+        self.assertEqual(frame["strokes"], [])
+        await ws.send_json({"type": "scene", "scene": {"size": 0.6}})
+        await self.receive(ws, "state", lambda d: d["state"]["scene"]["size"] == 0.6)
+        self.engine.render(0.0)
+        frame = await self.receive(ws, "frame", lambda d: not d["blanked"])
+        self.assertTrue(frame["strokes"])
         await ws.close()
 
     async def test_invalid_messages_get_error_and_keep_connection(self):
